@@ -14,7 +14,10 @@ export type BlockType =
   | 'callout'
   | 'divider'
   | 'image'
-  | 'file';
+  | 'file'
+  | 'subpage'
+  | 'pageLink'
+  | 'toc';
 
 export interface Block {
   id: string;
@@ -38,6 +41,8 @@ export interface Block {
   fileName?: string;
   fileSize?: number;
   fileMime?: string;
+  /** subpage and pageLink blocks: target page id */
+  pageId?: string;
 }
 
 export type PropertyType = 'text' | 'number' | 'select' | 'date' | 'checkbox';
@@ -55,7 +60,10 @@ export interface DBRow {
   cells: Record<string, string | number | boolean | null>;
 }
 
-export type DBView = 'table' | 'board' | 'calendar' | 'chart';
+export type DBView = 'table' | 'board' | 'calendar' | 'chart' | 'gallery';
+
+/** Chart types observed in Notion's icon set: chartLine, chartDonut, chartArea, chartAlternate. */
+export type ChartKind = 'bar' | 'horizontal' | 'line' | 'donut';
 
 export interface DBState {
   columns: DBColumn[];
@@ -68,6 +76,11 @@ export interface DBState {
   groupByColumnId: string | null;
   /** calendar date column */
   calendarColumnId: string | null;
+  /** chart preferences (optional: old databases fall back to bars by status) */
+  chartKind?: ChartKind;
+  chartColumnId?: string | null;
+  chartMetricColumnId?: string | null;
+  chartMetricOp?: 'sum' | 'avg';
 }
 
 export type PageKind = 'page' | 'database';
@@ -78,6 +91,8 @@ export interface Page {
   title: string;
   /** id into the authored icon set, or empty for default doc icon */
   icon: string;
+  /** cover preset id (a CSS gradient from the four-color palette) */
+  cover?: string;
   kind: PageKind;
   favorite: boolean;
   trashed: boolean;
@@ -168,5 +183,9 @@ export function defaultDBState(): DBState {
     sortDir: 'asc',
     groupByColumnId: 'c-status',
     calendarColumnId: 'c-due',
+    chartKind: 'bar',
+    chartColumnId: 'c-status',
+    chartMetricColumnId: null,
+    chartMetricOp: 'sum',
   };
 }

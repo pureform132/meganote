@@ -1,7 +1,7 @@
 {
     "name": "takenotes",
     "private": true,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "App de notas open source, local-first y en español con las funciones de Notion: bloques, bases de datos, búsqueda e importación.",
     "type": "module",
     "license": "MIT",

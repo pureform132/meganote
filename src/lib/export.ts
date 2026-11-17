@@ -20,7 +20,7 @@ export function timestamp(): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
 }
 
-function blockToMd(b: Block): string {
+function blockToMd(b: Block, pages?: Page[], allBlocks?: Block[]): string {
   const inline = (html: string) =>
     html
       .replace(/<b>|<\/b>|<strong>|<\/strong>/gi, '**')
@@ -44,11 +44,23 @@ function blockToMd(b: Block): string {
     case 'divider': return `---`;
     case 'image': return b.src ? `![${b.alt ?? ''}](${b.src.startsWith('data:') ? '(imagen incrustada — ver copia JSON)' : b.src})` : '';
     case 'file': return b.fileName ? `[archivo: ${b.fileName}]` : '';
+    case 'subpage': {
+      const target = pages?.find((p) => p.id === b.pageId);
+      return `- ${target?.title || 'Subpágina'}`;
+    }
+    case 'pageLink': {
+      const target = pages?.find((p) => p.id === b.pageId);
+      return `[${target?.title || 'Página'}]`;
+    }
+    case 'toc': {
+      const heads = (allBlocks ?? []).filter((x) => x.type === 'h1' || x.type === 'h2' || x.type === 'h3');
+      return heads.map((h) => `${'  '.repeat(h.type === 'h2' ? 1 : h.type === 'h3' ? 2 : 0)}- ${inline(h.html || h.text).trim()}`).join('\n');
+    }
     default: return text;
   }
 }
 
-export function pageToMarkdown(p: Page): string {
+export function pageToMarkdown(p: Page, allPages?: Page[]): string {
   if (p.kind === 'database' && p.db) {
     const cols = p.db.columns;
     const head = `| ${cols.map((c) => c.name).join(' | ')} |`;
@@ -67,7 +79,9 @@ export function pageToMarkdown(p: Page): string {
     );
     return [`# ${p.title || 'Untitled'}`, '', head, sep, ...rows].join('\n') + '\n';
   }
-  return [`# ${p.title || 'Untitled'}`, ''].concat(p.blocks.map(blockToMd).filter(Boolean)).join('\n') + '\n';
+  return [`# ${p.title || 'Untitled'}`, '']
+    .concat(p.blocks.map((b) => blockToMd(b, allPages, p.blocks)).filter(Boolean))
+    .join('\n') + '\n';
 }
 
 export function workspaceToJSON(ws: AppStore): string {

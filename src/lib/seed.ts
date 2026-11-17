@@ -27,8 +27,11 @@ function offsetDate(days: number): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-function row(name: string, status: string, priority: string, due: string, done: boolean): DBRow {
-  return { id: newId(), cells: { 'c-name': name, 'c-status': status, 'c-priority': priority, 'c-due': due, 'c-done': done } };
+function row(name: string, status: string, priority: string, due: string, done: boolean, effort: number): DBRow {
+  return {
+    id: newId(),
+    cells: { 'c-name': name, 'c-status': status, 'c-priority': priority, 'c-due': due, 'c-done': done, 'c-effort': effort },
+  };
 }
 
 export function seedStore(): AppStore {
@@ -41,10 +44,11 @@ export function seedStore(): AppStore {
     blocks: [
       b('text', 'Tu cuaderno vive en esta máquina — sin cuenta, sin nube, sin esperas. Todo lo que escribes se guarda localmente en tu navegador y sigue siendo tuyo.'),
       b('callout', 'Escribe <code>/</code> en cualquier punto para insertar un bloque. Pulsa <code>Ctrl</code>+<code>K</code> para saltar a cualquier página o buscarlo todo.'),
+      b('toc', ''),
       b('h2', 'Qué puedes hacer aquí'),
       b('bulleted', '<b>Bloques</b> — párrafos, encabezados, listas, to-dos, toggles, citas, código, callouts, imágenes y divisores.'),
       b('bulleted', '<b>Páginas dentro de páginas</b> — el árbol de la barra lateral anida sin límite.'),
-      b('bulleted', '<b>Bases de datos</b> — un conjunto de datos, tres vistas: tabla, tablero Kanban y calendario. Y también <b>gráfico</b>.'),
+      b('bulleted', '<b>Bases de datos</b> — un conjunto de datos, cinco vistas: tabla, tablero Kanban, calendario, gráfico y galería.'),
       b('bulleted', '<b>Encuentra cualquier cosa</b> — búsqueda a texto completo en títulos, bloques y filas de tus bases de datos.'),
       b('bulleted', '<b>Importa desde Notion</b> — en Notion: Configuración → Exportar → Markdown y CSV → sube el .zip aquí (sidebar → icono de importar).'),
       b('h2', 'Memoria muscular de Markdown'),
@@ -84,9 +88,42 @@ export function seedStore(): AppStore {
     ],
   });
 
+  gettingAround.blocks.push({
+    id: newId(),
+    type: 'pageLink',
+    text: '',
+    html: '',
+    level: 0,
+    pageId: shortcuts.id,
+  });
+
+  const firstDay = page({
+    title: 'Tu primer día',
+    icon: 'coffee',
+    parentId: welcome.id,
+    blocks: [
+      b('h2', 'Tres cosas y ya está'),
+      b('todo', 'Crear una página para lo que tengas en la cabeza'),
+      b('todo', 'Probar los comandos <code>/</code> en un bloque vacío'),
+      b('todo', 'Exportar una copia de seguridad desde el pie de la barra lateral'),
+      b('callout', 'Nada de esto sale de tu máquina. Ni siquiera esta página.'),
+      b('quote', 'Un cuaderno no se organiza antes de escribir: se organiza escribiendo.'),
+    ],
+  });
+
+  welcome.blocks.push({
+    id: newId(),
+    type: 'subpage',
+    text: '',
+    html: '',
+    level: 0,
+    pageId: firstDay.id,
+  });
+
   const cabin = page({
     title: 'Plan de fin de semana en la cabaña',
     icon: 'leaf',
+    cover: 'terra',
     blocks: [
       b('h2', 'Antes de conducir'),
       b('todo', 'Reservar el permiso de aparcamiento del trailhead', { checked: true }),
@@ -139,15 +176,16 @@ export function seedStore(): AppStore {
         },
         { id: 'c-due', name: 'Entrega', type: 'date' },
         { id: 'c-done', name: 'Hecho', type: 'checkbox' },
+        { id: 'c-effort', name: 'Esfuerzo (h)', type: 'number' },
       ],
       rows: [
-        row('Notas de campo del filo norte', 'o-doing', 'o-high', offsetDate(3), false),
-        row('Por qué tu README es tu puerta principal', 'o-edit', 'o-med', offsetDate(6), false),
-        row('El poder tranquilo de una bandeja de texto plano', 'o-idea', 'o-low', offsetDate(9), false),
-        row('Notas sobre mañanas lentas y trabajo profundo', 'o-live', 'o-med', offsetDate(-12), true),
-        row('Guía de campo para mejores valores por defecto', 'o-idea', 'o-high', offsetDate(14), false),
-        row('Lo que aprendí renombrando 400 archivos', 'o-edit', 'o-low', offsetDate(2), false),
-        row('El manifiesto para una mesa más tranquila', 'o-live', 'o-high', offsetDate(-21), true),
+        row('Notas de campo del filo norte', 'o-doing', 'o-high', offsetDate(3), false, 6),
+        row('Por qué tu README es tu puerta principal', 'o-edit', 'o-med', offsetDate(6), false, 4),
+        row('El poder tranquilo de una bandeja de texto plano', 'o-idea', 'o-low', offsetDate(9), false, 3),
+        row('Notas sobre mañanas lentas y trabajo profundo', 'o-live', 'o-med', offsetDate(-12), true, 5),
+        row('Guía de campo para mejores valores por defecto', 'o-idea', 'o-high', offsetDate(14), false, 8),
+        row('Lo que aprendí renombrando 400 archivos', 'o-edit', 'o-low', offsetDate(2), false, 2),
+        row('El manifiesto para una mesa más tranquila', 'o-live', 'o-high', offsetDate(-21), true, 4),
       ],
       view: 'table',
       filter: '',
@@ -155,6 +193,10 @@ export function seedStore(): AppStore {
       sortDir: 'asc',
       groupByColumnId: 'c-status',
       calendarColumnId: 'c-due',
+      chartKind: 'bar',
+      chartColumnId: 'c-status',
+      chartMetricColumnId: null,
+      chartMetricOp: 'sum',
     },
   };
 
@@ -175,7 +217,7 @@ export function seedStore(): AppStore {
     name: 'Personal',
     icon: 'leaf',
     created: now(),
-    pages: [welcome, gettingAround, shortcuts, cabin, pipeline, library],
+    pages: [welcome, firstDay, gettingAround, shortcuts, cabin, pipeline, library],
   };
 
   return { version: 2, notebooks: [notebook], currentId: notebook.id };

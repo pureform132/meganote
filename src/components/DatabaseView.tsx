@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Icon, type IconName } from '../lib/icons';
-import { newId, type DBColumn, type DBRow, type DBView, type Page, type PropertyType } from '../lib/types';
+import { newId, type ChartKind, type DBColumn, type DBRow, type DBView, type Page, type PropertyType } from '../lib/types';
 
 const TONE_BY_INDEX = ['ink', 'terra', 'sage'] as const;
 
@@ -170,6 +170,7 @@ export function DatabaseView({ page }: { page: Page }) {
             { v: 'board' as DBView, label: 'Tablero', icon: 'board' as IconName },
             { v: 'calendar' as DBView, label: 'Calendario', icon: 'calendar' as IconName },
             { v: 'chart' as DBView, label: 'Gráfico', icon: 'chart' as IconName },
+            { v: 'gallery' as DBView, label: 'Galería', icon: 'gallery' as IconName },
           ]).map(({ v, label, icon }) => (
             <button key={v} role="tab" aria-selected={db.view === v}
               className={`viewtab${db.view === v ? ' is-active' : ''}`} onClick={() => setView(v)}>
@@ -451,7 +452,18 @@ export function DatabaseView({ page }: { page: Page }) {
       )}
 
       {/* VISTA GRÁFICO */}
-      {db.view === 'chart' && <ChartView db={db} />}
+      {db.view === 'chart' && <ChartView db={db} mutate={mutate} />}
+
+      {/* VISTA GALERÍA */}
+      {db.view === 'gallery' && (
+        <GalleryView
+          db={db}
+          firstColId={firstColId ?? db.columns[0]?.id ?? ''}
+          onAdd={() => addRow()}
+          onDelete={deleteRow}
+          setCell={setCell}
+        />
+      )}
 
       <p style={{ marginTop: 14, fontSize: 11, color: 'var(--ink-38)' }}>
         {db.rows.length} {db.rows.length === 1 ? 'fila' : 'filas'} · guardado localmente{db.filter.trim() ? ' · filtrado' : ''}
@@ -460,110 +472,416 @@ export function DatabaseView({ page }: { page: Page }) {
   );
 }
 
-function ChartView({ db }: { db: NonNullable<Page['db']> }) {
+type ChartPoint = { key: string; label: string; value: number; tone: 'sage' | 'terra' | 'ink' };
+
+const CHART_KINDS: { id: ChartKind; label: string; icon: IconName }[] = [
+  { id: 'bar', label: 'Barras', icon: 'chart' },
+  { id: 'horizontal', label: 'Horizontal', icon: 'sort' },
+  { id: 'line', label: 'Líneas', icon: 'chartLine' },
+  { id: 'donut', label: 'Donut', icon: 'chartDonut' },
+];
+
+function toneColor(tone: ChartPoint['tone']): string {
+  if (tone === 'sage') return 'var(--sage)';
+  if (tone === 'terra') return 'var(--terra)';
+  return 'var(--ink-70, var(--ink))';
+}
+
+function ChartView({
+  db,
+  mutate,
+}: {
+  db: NonNullable<Page['db']>;
+  mutate: (fn: (draft: NonNullable<Page['db']>) => void) => void;
+}) {
   const candidates = useMemo(
-    () => [
-      ...db.columns.filter((c) => c.type === 'select'),
-      ...db.columns.filter((c) => c.type === 'date'),
-    ],
+    () => db.columns.filter((c) => c.type === 'select' || c.type === 'date' || c.type === 'checkbox' || c.type === 'text'),
     [db.columns],
   );
-  const [axisId, setAxisId] = useState<string>(() => candidates[0]?.id ?? '');
-  const axis = candidates.find((c) => c.id === axisId) ?? candidates[0];
+  const numeric = useMemo(() => db.columns.filter((c) => c.type === 'number'), [db.columns]);
+  const axis =
+    candidates.find((c) => c.id === db.chartColumnId)
+    ?? candidates.find((c) => c.type === 'select')
+    ?? candidates.find((c) => c.type === 'date')
+    ?? candidates.find((c) => c.type === 'checkbox')
+    ?? candidates[0]
+    ?? null;
+  const metricCol = numeric.find((c) => c.id === db.chartMetricColumnId) ?? null;
+  const metricOp = db.chartMetricOp ?? 'sum';
+  const kind = db.chartKind ?? 'bar';
 
-  const data = useMemo((): { label: string; value: number; tone?: 'sage' | 'terra' | 'ink' }[] => {
+  const aggregate = (rows: DBRow[]): number => {
+    if (!metricCol) return rows.length;
+    const sum = rows.reduce((acc, row) => {
+      const raw = row.cells[metricCol.id];
+      return acc + (typeof raw === 'number' ? raw : Number(raw ?? 0) || 0);
+    }, 0);
+    if (metricOp === 'avg' && rows.length > 0) return sum / rows.length;
+    return sum;
+  };
+
+  const points = useMemo<ChartPoint[]>(() => {
     if (!axis) return [];
     if (axis.type === 'select') {
-      const counts = new Map<string, number>();
-      for (const r of db.rows) {
-        const v = r.cells[axis.id];
-        const key = typeof v === 'string' && v ? v : '__none__';
-        counts.set(key, (counts.get(key) ?? 0) + 1);
-      }
-      const arr = (axis.options ?? []).map((o) => ({ label: o.label, value: counts.get(o.id) ?? 0, tone: o.tone }));
-      const none = counts.get('__none__') ?? 0;
-      if (none > 0) arr.push({ label: 'Sin valor', value: none, tone: 'ink' as const });
-      return arr;
+      const out: ChartPoint[] = (axis.options ?? []).map((o) => ({
+        key: o.id,
+        label: o.label,
+        value: aggregate(db.rows.filter((r) => r.cells[axis.id] === o.id)),
+        tone: o.tone,
+      }));
+      const none = db.rows.filter((r) => !r.cells[axis.id]);
+      if (none.length > 0) out.push({ key: '__none__', label: 'Sin valor', value: aggregate(none), tone: 'ink' });
+      return out;
     }
-    // serie por mes (últimos 6 meses)
-    const nowD = new Date();
-    const months: { key: string; label: string }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(nowD.getFullYear(), nowD.getMonth() - i, 1);
-      months.push({
-        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-        label: d.toLocaleString('es', { month: 'short' }),
+    if (axis.type === 'checkbox') {
+      return [
+        { key: 'yes', label: 'Hecho', value: aggregate(db.rows.filter((r) => !!r.cells[axis.id])), tone: 'sage' },
+        { key: 'no', label: 'Pendiente', value: aggregate(db.rows.filter((r) => !r.cells[axis.id])), tone: 'ink' },
+      ];
+    }
+    if (axis.type === 'date') {
+      const now = new Date();
+      const months: { key: string; label: string }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({
+          key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+          label: d.toLocaleString('es', { month: 'short' }),
+        });
+      }
+      return months.map((m) => ({
+        key: m.key,
+        label: m.label,
+        value: aggregate(db.rows.filter((r) => typeof r.cells[axis.id] === 'string' && String(r.cells[axis.id]).startsWith(m.key))),
+        tone: 'terra',
+      }));
+    }
+    const groups = new Map<string, DBRow[]>();
+    for (const row of db.rows) {
+      const raw = row.cells[axis.id];
+      const label = String(raw ?? '').trim() || 'Sin valor';
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label)!.push(row);
+    }
+    const ordered = [...groups.entries()]
+      .map(([label, rows], index) => ({
+        key: label,
+        label,
+        rows,
+        value: aggregate(rows),
+        tone: (['ink', 'terra', 'sage'] as const)[index % 3],
+      }))
+      .sort((a, b) => b.value - a.value);
+    const top: ChartPoint[] = ordered.slice(0, 8).map(({ key, label, value, tone }) => ({ key, label, value, tone }));
+    if (ordered.length > 8) {
+      top.push({
+        key: '__other__',
+        label: 'Otros',
+        value: aggregate(ordered.slice(8).flatMap((x) => x.rows)),
+        tone: 'ink',
       });
     }
-    const counts = new Map<string, number>();
-    for (const r of db.rows) {
-      const v = r.cells[axis.id];
-      if (typeof v === 'string' && v) {
-        const key = v.slice(0, 7);
-        if (months.some((m) => m.key === key)) counts.set(key, (counts.get(key) ?? 0) + 1);
-      }
-    }
-    return months.map((m) => ({ label: m.label, value: counts.get(m.key) ?? 0 }));
-  }, [db.rows, axis]);
+    return top;
+  }, [axis, db.rows, metricCol, metricOp]);
 
   if (candidates.length === 0) {
     return (
       <p style={{ color: 'var(--ink-55)', padding: '30px 8px' }}>
-        Añade una propiedad de <b>Selección</b> o <b>Fecha</b> para graficar los datos.
+        Añade una propiedad de <b>Selección</b>, <b>Fecha</b>, <b>Casilla</b> o <b>Texto</b> para graficar los datos.
       </p>
     );
   }
 
-  const max = Math.max(1, ...data.map((d) => d.value));
-  const W = 760, H = 250, PT = 26, PB = 46, PL = 8, PR = 8;
-  const innerW = W - PL - PR;
-  const innerH = H - PT - PB;
-  const slot = innerW / Math.max(1, data.length);
-  const barW = Math.min(78, slot * 0.62);
-  const total = data.reduce((a, d) => a + d.value, 0);
+  const total = points.reduce((acc, p) => acc + p.value, 0);
+  const max = Math.max(1, ...points.map((p) => p.value));
+  const avg = points.length > 0 ? total / points.length : 0;
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  const valueLabel = metricCol
+    ? `${metricOp === 'avg' ? 'Media' : 'Suma'} de ${metricCol.name}`
+    : 'Recuento de filas';
 
-  const barFill = (tone?: 'sage' | 'terra' | 'ink') =>
-    tone === 'sage' ? 'var(--sage)' : tone === 'terra' ? 'var(--terra)' : tone === 'ink' ? 'var(--ink-70, var(--ink))' : 'var(--terra)';
+  const W = 820;
+  const H = 300;
+  const PT = 28;
+  const PB = 48;
+  const barPL = 14;
+  const barPR = 14;
+  const innerH = H - PT - PB;
+
+  const setMetric = (value: string) => {
+    mutate((d) => {
+      if (value === 'count') {
+        d.chartMetricColumnId = null;
+      } else {
+        const [op, id] = value.split(':');
+        d.chartMetricOp = op as 'sum' | 'avg';
+        d.chartMetricColumnId = id;
+      }
+    });
+  };
 
   return (
     <div className="chartwrap">
       <div className="charttools">
-        <span className="charttools__label">Agrupar por</span>
-        <select
-          className="dbselect"
-          value={axis?.id ?? ''}
-          onChange={(e) => setAxisId(e.target.value)}
-          aria-label="Columna para agrupar el gráfico"
-        >
-          {candidates.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+        <div className="charttool">
+          <span className="charttools__label">Agrupar por</span>
+          <select
+            className="dbselect"
+            value={axis?.id ?? ''}
+            onChange={(e) => mutate((d) => { d.chartColumnId = e.target.value; })}
+            aria-label="Columna para agrupar el gráfico"
+          >
+            {candidates.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="charttool">
+          <span className="charttools__label">Valor</span>
+          <select
+            className="dbselect"
+            value={metricCol ? `${metricOp}:${metricCol.id}` : 'count'}
+            onChange={(e) => setMetric(e.target.value)}
+            aria-label="Qué valor mostrar en el gráfico"
+          >
+            <option value="count">Recuento de filas</option>
+            {numeric.map((c) => (
+              <option key={`sum-${c.id}`} value={`sum:${c.id}`}>Suma de {c.name}</option>
+            ))}
+            {numeric.map((c) => (
+              <option key={`avg-${c.id}`} value={`avg:${c.id}`}>Media de {c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="chartkinds" role="tablist" aria-label="Tipo de gráfico">
+          {CHART_KINDS.map((k) => (
+            <button
+              key={k.id}
+              role="tab"
+              aria-selected={kind === k.id}
+              className={kind === k.id ? 'is-active' : ''}
+              onClick={() => mutate((d) => { d.chartKind = k.id; })}
+            >
+              <Icon name={k.icon} size={14} /> {k.label}
+            </button>
           ))}
-        </select>
+        </div>
       </div>
-      <svg className="chartsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico de barras de ${axis?.name ?? ''}`}>
-        {[0.25, 0.5, 0.75].map((f, i) => {
-          const y = PT + innerH * (1 - f);
-          return <line key={i} x1={PL} x2={W - PR} y1={y} y2={y} stroke="var(--line-soft)" strokeDasharray="2 5" />;
-        })}
-        <line x1={PL} x2={W - PR} y1={PT + innerH} y2={PT + innerH} stroke="var(--line)" />
-        {data.map((d, i) => {
-          const h = (d.value / max) * innerH;
-          const x = PL + i * slot + (slot - barW) / 2;
-          const y = PT + innerH - h;
-          const fill = barFill(d.tone);
+
+      <div className="chartstats">
+        <div><b>{fmt(total)}</b><span>Total</span></div>
+        <div><b>{fmt(max)}</b><span>Máximo</span></div>
+        <div><b>{fmt(avg)}</b><span>Media por grupo</span></div>
+        <div><b>{points.length}</b><span>Grupos</span></div>
+      </div>
+
+      {points.length === 0 ? (
+        <p className="chartempty">Aún no hay datos que dibujar.</p>
+      ) : kind === 'donut' ? (
+        <div className="donutwrap">
+          <svg className="donutchart" viewBox="0 0 280 280" role="img" aria-label={`Gráfico donut de ${axis?.name ?? ''}`}>
+            <circle cx="140" cy="140" r="92" fill="none" stroke="var(--line-soft)" strokeWidth="30" />
+            {(() => {
+              let offset = 0;
+              return points.map((p) => {
+                const pct = total > 0 ? p.value / total : 0;
+                const dash = pct * 100;
+                const el = (
+                  <circle
+                    key={p.key}
+                    cx="140"
+                    cy="140"
+                    r="92"
+                    fill="none"
+                    stroke={toneColor(p.tone)}
+                    strokeWidth="30"
+                    pathLength={100}
+                    strokeDasharray={`${dash} ${100 - dash}`}
+                    strokeDashoffset={-offset}
+                    transform="rotate(-90 140 140)"
+                  >
+                    <title>{`${p.label}: ${fmt(p.value)}`}</title>
+                  </circle>
+                );
+                offset += dash;
+                return el;
+              });
+            })()}
+            <text x="140" y="134" textAnchor="middle" className="donuttotal">{fmt(total)}</text>
+            <text x="140" y="156" textAnchor="middle" className="donutcap">{metricCol ? metricCol.name : 'filas'}</text>
+          </svg>
+          <ul className="donutlegend">
+            {points.map((p) => (
+              <li key={p.key}>
+                <i style={{ background: toneColor(p.tone) }} />
+                <span className="donutlegend__name">{p.label}</span>
+                <span className="donutlegend__value">{fmt(p.value)}</span>
+                <span className="donutlegend__pct">{total > 0 ? Math.round((p.value / total) * 100) : 0}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : kind === 'line' ? (
+        <svg className="chartsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico de líneas de ${axis?.name ?? ''}`}>
+          {[0.25, 0.5, 0.75].map((f, i) => {
+            const y = PT + innerH * (1 - f);
+            return <line key={i} x1={barPL} x2={W - barPR} y1={y} y2={y} stroke="var(--line-soft)" strokeDasharray="2 5" />;
+          })}
+          <line x1={barPL} x2={W - barPR} y1={PT + innerH} y2={PT + innerH} stroke="var(--line)" />
+          {(() => {
+            const slot = (W - barPL - barPR) / Math.max(1, points.length);
+            const coords = points.map((p, i) => ({
+              x: barPL + slot * i + slot / 2,
+              y: PT + innerH - (p.value / max) * innerH,
+              p,
+            }));
+            const path = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x} ${c.y}`).join(' ');
+            const area = `${path} L ${coords[coords.length - 1].x} ${PT + innerH} L ${coords[0].x} ${PT + innerH} Z`;
+            return (
+              <>
+                <path d={area} fill="color-mix(in oklab, var(--terra) 14%, transparent)" stroke="none" />
+                <path d={path} fill="none" stroke="var(--terra)" strokeWidth="2.2" strokeLinejoin="round" />
+                {coords.map((c) => (
+                  <g key={c.p.key}>
+                    <title>{`${c.p.label}: ${fmt(c.p.value)}`}</title>
+                    <circle cx={c.x} cy={c.y} r="4.2" fill="var(--paper)" stroke="var(--terra)" strokeWidth="2" />
+                    {c.p.value > 0 && <text x={c.x} y={c.y - 11} textAnchor="middle" className="chartval">{fmt(c.p.value)}</text>}
+                    <text x={c.x} y={PT + innerH + 19} textAnchor="middle" className="chartlab">{c.p.label.length > 14 ? c.p.label.slice(0, 13) + '…' : c.p.label}</text>
+                  </g>
+                ))}
+              </>
+            );
+          })()}
+        </svg>
+      ) : kind === 'horizontal' ? (
+        <svg className="chartsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico horizontal de ${axis?.name ?? ''}`}>
+          {[0.25, 0.5, 0.75].map((f, i) => {
+            const x = 170 + (W - 230) * f;
+            return <line key={i} x1={x} x2={x} y1={PT} y2={PT + innerH} stroke="var(--line-soft)" strokeDasharray="2 5" />;
+          })}
+          {(() => {
+            const labelW = 158;
+            const barW = W - labelW - 60;
+            const rowH = innerH / Math.max(1, points.length);
+            return points.map((p, i) => {
+              const y = PT + i * rowH + rowH * 0.2;
+              const h = Math.max(8, Math.min(26, rowH * 0.58));
+              const w = (p.value / max) * barW;
+              return (
+                <g key={p.key}>
+                  <title>{`${p.label}: ${fmt(p.value)}`}</title>
+                  <text x={labelW - 10} y={y + h * 0.7} textAnchor="end" className="chartlab">{p.label.length > 20 ? p.label.slice(0, 19) + '…' : p.label}</text>
+                  <rect x={labelW} y={y} width={Math.max(2, w)} height={h} rx={4} fill={toneColor(p.tone)} opacity={p.value > 0 ? 1 : 0.25} />
+                  <text x={labelW + w + 8} y={y + h * 0.7} className="chartval">{fmt(p.value)}</text>
+                </g>
+              );
+            });
+          })()}
+        </svg>
+      ) : (
+        <svg className="chartsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico de barras de ${axis?.name ?? ''}`}>
+          {[0.25, 0.5, 0.75].map((f, i) => {
+            const y = PT + innerH * (1 - f);
+            return <line key={i} x1={barPL} x2={W - barPR} y1={y} y2={y} stroke="var(--line-soft)" strokeDasharray="2 5" />;
+          })}
+          <line x1={barPL} x2={W - barPR} y1={PT + innerH} y2={PT + innerH} stroke="var(--line)" />
+          {(() => {
+            const innerW = W - barPL - barPR;
+            const slot = innerW / Math.max(1, points.length);
+            const barW = Math.min(78, slot * 0.62);
+            return points.map((p, i) => {
+              const h = (p.value / max) * innerH;
+              const x = barPL + i * slot + (slot - barW) / 2;
+              const y = PT + innerH - h;
+              return (
+                <g key={p.key} className="chartbar">
+                  <title>{`${p.label}: ${fmt(p.value)}`}</title>
+                  <rect x={x} y={y} width={barW} height={Math.max(h, p.value > 0 ? 3 : 2)} rx={5} fill={toneColor(p.tone)} opacity={p.value > 0 ? 1 : 0.25} />
+                  {p.value > 0 && <text x={x + barW / 2} y={y - 8} textAnchor="middle" className="chartval">{fmt(p.value)}</text>}
+                  <text x={x + barW / 2} y={PT + innerH + 20} textAnchor="middle" className="chartlab">{p.label.length > 14 ? p.label.slice(0, 13) + '…' : p.label}</text>
+                </g>
+              );
+            });
+          })()}
+        </svg>
+      )}
+
+      <p className="chartfoot">
+        {points.length} {points.length === 1 ? 'grupo' : 'grupos'} · eje: {axis?.name} · {valueLabel} · guardado localmente
+      </p>
+    </div>
+  );
+}
+
+function GalleryView({
+  db,
+  firstColId,
+  onAdd,
+  onDelete,
+  setCell,
+}: {
+  db: NonNullable<Page['db']>;
+  firstColId: string;
+  onAdd: () => void;
+  onDelete: (rowId: string) => void;
+  setCell: (rowId: string, colId: string, value: DBRow['cells'][string]) => void;
+}) {
+  const first = db.columns.find((c) => c.id === firstColId);
+  const selectCols = db.columns.filter((c) => c.type === 'select');
+  const showProps = db.columns.filter((c) => c.id !== firstColId).slice(0, 4);
+
+  return (
+    <div className="gallerywrap">
+      <div className="gallerygrid">
+        {db.rows.map((row) => {
+          const tone = selectCols
+            .map((c) => c.options?.find((o) => o.id === row.cells[c.id]))
+            .find(Boolean)?.tone;
           return (
-            <g key={i} className="chartbar">
-              <title>{`${d.label}: ${d.value} ${d.value === 1 ? 'fila' : 'filas'}`}</title>
-              <rect x={x} y={y} width={barW} height={Math.max(h, d.value > 0 ? 3 : 2)} rx={5} fill={fill} opacity={d.value > 0 ? 1 : 0.25} />
-              {d.value > 0 && (
-                <text x={x + barW / 2} y={y - 7} textAnchor="middle" className="chartval">{d.value}</text>
-              )}
-              <text x={x + barW / 2} y={PT + innerH + 18} textAnchor="middle" className="chartlab">{d.label}</text>
-            </g>
+            <article key={row.id} className="gcard">
+              <div className={`gcard__band${tone ? ` tone-${tone}` : ''}`}>
+                <Icon name="doc" size={18} />
+              </div>
+              <div className="gcard__body">
+                <input
+                  className="gcard__title"
+                  value={String(row.cells[firstColId] ?? '')}
+                  placeholder={first?.name ?? 'Sin título'}
+                  aria-label={first?.name ?? 'Título de la tarjeta'}
+                  onChange={(e) => setCell(row.id, firstColId, e.target.value)}
+                />
+                <div className="gcard__props">
+                  {showProps.map((col) => {
+                    const value = row.cells[col.id];
+                    if (col.type === 'select') {
+                      const opt = col.options?.find((o) => o.id === value);
+                      return opt ? (
+                        <span key={col.id} className="pill" data-tone={opt.tone}><i />{opt.label}</span>
+                      ) : null;
+                    }
+                    if (col.type === 'checkbox') {
+                      return (
+                        <span key={col.id} className={`gcard__bool${value ? ' is-on' : ''}`}>
+                          <Icon name={value ? 'check' : 'x'} size={10} /> {col.name}
+                        </span>
+                      );
+                    }
+                    if (value === null || value === undefined || value === '') return null;
+                    return <span key={col.id} className="gcard__prop">{col.name}: {String(value)}</span>;
+                  })}
+                </div>
+              </div>
+              <button className="rowdel" title="Eliminar tarjeta" aria-label="Eliminar tarjeta" onClick={() => onDelete(row.id)}>
+                <Icon name="x" size={13} />
+              </button>
+            </article>
           );
         })}
-      </svg>
-      <p className="chartfoot">{total} {total === 1 ? 'fila' : 'filas'} en el gráfico · eje: {axis?.name}</p>
+        <button className="gcard gcard--add" onClick={onAdd}>
+          <Icon name="plus" size={16} />
+          <span>Nueva tarjeta</span>
+        </button>
+      </div>
     </div>
   );
 }

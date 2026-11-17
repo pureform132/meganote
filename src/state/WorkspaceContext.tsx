@@ -35,6 +35,8 @@ export interface WorkspaceContextValue {
   renameNotebook: (id: string, name: string) => void;
 
   createPage: (parentId: string | null, kind?: PageKind) => string;
+  duplicatePage: (id: string) => string;
+  movePage: (id: string, parentId: string | null) => boolean;
   updatePage: (id: string, patch: Partial<Omit<Page, 'id' | 'created'>>) => void;
   toggleFavorite: (id: string) => void;
   trashPage: (id: string) => void;
@@ -44,6 +46,7 @@ export interface WorkspaceContextValue {
   trashCount: number;
   trashedPages: Page[];
 
+  addBlock: (pageId: string, block: Block) => void;
   updateBlock: (pageId: string, blockId: string, patch: Partial<Block>) => void;
   removeBlock: (pageId: string, blockId: string) => void;
   splitBlock: (pageId: string, blockId: string, beforeHtml: string, beforeText: string, afterHtml: string, afterText: string) => string;
@@ -221,6 +224,53 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [updateCurrent],
   );
 
+  const duplicatePage = useCallback(
+    (id: string) => {
+      const source = pages.find((p) => p.id === id);
+      if (!source) return '';
+      const ids = subtreeIds(pages, id);
+      const ordered = pages.filter((p) => ids.has(p.id));
+      const idMap = new Map(ordered.map((p) => [p.id, newId()]));
+      const t = now();
+      const copies: Page[] = ordered.map((p, index) => ({
+        ...p,
+        id: idMap.get(p.id)!,
+        parentId: p.parentId && idMap.has(p.parentId) ? idMap.get(p.parentId)! : p.parentId,
+        title: index === 0 ? (p.title ? `${p.title} (copia)` : 'Copia sin título') : p.title,
+        favorite: false,
+        trashed: false,
+        created: t,
+        updated: t,
+        blocks: p.blocks.map((b) => ({
+          ...b,
+          id: newId(),
+          pageId: b.pageId && idMap.has(b.pageId) ? idMap.get(b.pageId)! : b.pageId,
+        })),
+        db: p.db ? (JSON.parse(JSON.stringify(p.db)) as DBState) : undefined,
+      }));
+      const root = copies[0];
+      if (!root) return '';
+      updateCurrent((prev) => [...prev, ...copies]);
+      setActivePageId(root.id);
+      setShowTrash(false);
+      return root.id;
+    },
+    [pages, updateCurrent],
+  );
+
+  const movePage = useCallback(
+    (id: string, parentId: string | null) => {
+      if (id === parentId) return false;
+      const ids = subtreeIds(pages, id);
+      if (parentId && ids.has(parentId)) return false;
+      updateCurrent((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, parentId, updated: now() } : p)),
+      );
+      return true;
+    },
+    [pages, updateCurrent],
+  );
+
   const updatePage = useCallback(
     (id: string, patch: Partial<Omit<Page, 'id' | 'created'>>) => {
       updateCurrent((prev) => prev.map((p) => (p.id === id ? { ...p, ...touch(patch) } : p)));
@@ -270,6 +320,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActivePageId(null);
     setShowTrash(false);
   }, [updateCurrent]);
+
+  const addBlock = useCallback(
+    (pageId: string, block: Block) => {
+      updateCurrent((prev) =>
+        prev.map((p) => (p.id === pageId ? { ...p, blocks: [...p.blocks, block], updated: now() } : p)),
+      );
+    },
+    [updateCurrent],
+  );
 
   const updateBlock = useCallback(
     (pageId: string, blockId: string, patch: Partial<Block>) => {
@@ -395,7 +454,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         .replace(/[^a-z0-9áéíóúñü]+/gi, '-')
         .replace(/^-+|-+$/g, '')
         .slice(0, 60) || 'pagina';
-    downloadFile(`takenotes-${safe}-${timestamp()}.md`, pageToMarkdown(p), 'text/markdown');
+    downloadFile(`takenotes-${safe}-${timestamp()}.md`, pageToMarkdown(p, current?.pages), 'text/markdown');
   }, []);
 
   const importBackup = useCallback(async (file: File) => {
@@ -480,6 +539,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     createNotebook,
     renameNotebook,
     createPage,
+    duplicatePage,
+    movePage,
     updatePage,
     toggleFavorite,
     trashPage,
@@ -488,6 +549,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     emptyTrash,
     trashCount,
     trashedPages,
+    addBlock,
     updateBlock,
     removeBlock,
     splitBlock,

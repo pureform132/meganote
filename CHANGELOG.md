@@ -2,6 +2,26 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.1.0] — 2026-11-17
+
+### Añadido
+
+- **Subpáginas**: crea una página hija desde el encabezado o con `/subpágina`; aparece como tarjeta dentro del padre y en el árbol lateral.
+- **Stickers de página**: 43 iconos propios con buscador y cuatro grupos (Esenciales, Naturaleza, Vida, Símbolos).
+- **Portadas**: seis tonos planos de la paleta (Salvia, Terracota, Papel, Amanecer, Atardecer, Noche) con cambio y borrado.
+- **Tabla de contenido**: bloque `/toc` generado automáticamente desde H1–H3, con navegación al encabezado.
+- **Duplicar página**: copia la página y todo su subárbol, incluidos bases de datos y referencias internas.
+- **Mover página**: diálogo con buscador y árbol de destinos, con protección contra ciclos.
+- **Enlaces a páginas y backlinks**: bloque `Enlace a página` con selector y sección «Mencionada en».
+- **Vista Galería** para bases de datos, con tarjetas editables y portada por tono.
+- **Gráficos**: cuatro tipos (barras, horizontal, líneas/área y donut), agrupación por selección/fecha/casilla/texto, métrica de recuento/suma/media y tarjetas de resumen.
+- Columna numérica de ejemplo «Esfuerzo (h)» para probar suma y media.
+
+### Corregido
+
+- El DOM editable ya no conserva el texto `/comando` al convertir un bloque en índice, enlace o subpágina.
+- Las portadas usan formas planas, no degradados, para respetar «The Paper Desk».
+
 ## [1.0.0] — 2026-11-17
 
 Primera versión pública de Takenotes.

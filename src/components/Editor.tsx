@@ -4,11 +4,11 @@
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Icon, type IconName } from '../lib/icons';
 import { sanitizeInline, htmlToText, escapeHtml } from '../lib/html';
+import { COVERS, COVER_BY_ID, searchPageIcons } from '../lib/pageIcons';
 import { SlashMenu, SLASH_COMMANDS, type SlashCommand } from './SlashMenu';
-import type { Block, BlockType, Page } from '../lib/types';
+import { newId, type Block, type BlockType, type Page } from '../lib/types';
 
 const LISTISH: BlockType[] = ['bulleted', 'numbered', 'todo', 'toggle'];
-const ICON_CHOICES: IconName[] = ['doc', 'sun', 'compass', 'keyboard', 'leaf', 'briefcase', 'book', 'folder'];
 const FILE_SIZE_LIMIT = 8 * 1024 * 1024; // 8 MB
 
 function placeholderFor(type: BlockType): string {
@@ -97,13 +97,19 @@ function wrapSelectionInCode(el: HTMLElement) {
 
 export function Editor({ page }: { page: Page }) {
   const {
-    updatePage, toggleFavorite, trashPage, byId,
-    updateBlock, removeBlock, splitBlock, mergeIntoPrevious,
+    pages, updatePage, toggleFavorite, trashPage, byId, setActivePageId,
+    createPage, duplicatePage, movePage,
+    addBlock, updateBlock, removeBlock, splitBlock, mergeIntoPrevious,
     focusRequest, requestFocus, exportPageMarkdown,
   } = useWorkspace();
 
   const [slash, setSlash] = useState<{ blockId: string; query: string; selected: number } | null>(null);
   const [iconPick, setIconPick] = useState(false);
+  const [iconQuery, setIconQuery] = useState('');
+  const [coverOpen, setCoverOpen] = useState(false);
+  const [pageMenuOpen, setPageMenuOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [linkPickerFor, setLinkPickerFor] = useState<string | null>(null);
   const [dividerSel, setDividerSel] = useState<string | null>(null);
   const [imageErr, setImageErr] = useState<Record<string, string>>({});
   const [slashPos, setSlashPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -146,6 +152,43 @@ export function Editor({ page }: { page: Page }) {
     return out;
   }, [page.blocks]);
 
+  const iconGroups = useMemo(() => searchPageIcons(iconQuery), [iconQuery]);
+
+  const inlineSubpageIds = useMemo(
+    () => new Set(page.blocks.filter((b) => b.type === 'subpage' && b.pageId).map((b) => b.pageId!)),
+    [page.blocks],
+  );
+  const extraSubpages = useMemo(
+    () => pages.filter((p) => p.parentId === page.id && !p.trashed && !inlineSubpageIds.has(p.id)),
+    [pages, page.id, inlineSubpageIds],
+  );
+  const backlinks = useMemo(
+    () =>
+      pages.filter(
+        (p) =>
+          p.id !== page.id &&
+          p.blocks.some((b) => b.type === 'pageLink' && b.pageId === page.id),
+      ),
+    [pages, page.id],
+  );
+  const childCount = useCallback(
+    (targetId: string) => pages.filter((p) => p.parentId === targetId && !p.trashed).length,
+    [pages],
+  );
+
+  const createSubpage = useCallback(() => {
+    const childId = createPage(page.id, 'page');
+    addBlock(page.id, {
+      id: newId(),
+      type: 'subpage',
+      text: '',
+      html: '',
+      level: 0,
+      pageId: childId,
+    });
+    setActivePageId(childId);
+  }, [addBlock, createPage, page.id, setActivePageId]);
+
   // gestión del foco
   useEffect(() => {
     if (!focusRequest) return;
@@ -161,11 +204,16 @@ export function Editor({ page }: { page: Page }) {
     const onDoc = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       if (dividerSel && !t.closest('.divider-row')) setDividerSel(null);
-      if (iconPick && !t.closest('.titleicon')) setIconPick(false);
+      if (iconPick && !t.closest('.titleicon') && !t.closest('.iconpick')) {
+        setIconPick(false);
+        setIconQuery('');
+      }
+      if (pageMenuOpen && !t.closest('.pagemenu-wrap')) setPageMenuOpen(false);
+      if (linkPickerFor && !t.closest('.pagelink-picker') && !t.closest('.pagelink-open')) setLinkPickerFor(null);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [dividerSel, iconPick]);
+  }, [dividerSel, iconPick, pageMenuOpen, linkPickerFor]);
 
   useEffect(() => {
     if (!dividerSel) return;
@@ -243,7 +291,7 @@ export function Editor({ page }: { page: Page }) {
     const inner = wrap?.querySelector<HTMLElement>('.block-content');
     if (inner) inner.innerHTML = '';
     setSlash(null);
-    if (type !== 'divider' && type !== 'image' && type !== 'file') {
+    if (!['divider', 'image', 'file', 'toc', 'subpage', 'pageLink'].includes(type)) {
       requestFocus(b.id);
     }
   }, [page.id, updateBlock, requestFocus]);
@@ -251,6 +299,36 @@ export function Editor({ page }: { page: Page }) {
   const applySlashPick = useCallback((cmd: SlashCommand) => {
     const b = page.blocks.find((x) => x.id === slash?.blockId);
     if (!b) { setSlash(null); return; }
+
+    // Una subpágina crea la página hija y deja una tarjeta en el padre.
+    const clearEditingDom = () => {
+      blockEls.current.get(b.id)?.querySelector<HTMLElement>('.block-content')?.replaceChildren();
+    };
+
+    if (cmd.type === 'subpage') {
+      const childId = createPage(page.id, 'page');
+      clearEditingDom();
+      updateBlock(page.id, b.id, { type: 'subpage', pageId: childId, html: '', text: '' });
+      setSlash(null);
+      setActivePageId(childId);
+      return;
+    }
+    // Un enlace abre el selector de páginas dentro del propio bloque.
+    if (cmd.type === 'pageLink') {
+      clearEditingDom();
+      updateBlock(page.id, b.id, { type: 'pageLink', pageId: undefined, html: '', text: '' });
+      setSlash(null);
+      setLinkPickerFor(b.id);
+      return;
+    }
+    // El índice no es editable: se calcula solo.
+    if (cmd.type === 'toc') {
+      clearEditingDom();
+      updateBlock(page.id, b.id, { type: 'toc', html: '', text: '' });
+      setSlash(null);
+      return;
+    }
+
     const wrap = blockEls.current.get(b.id);
     const inner = wrap?.querySelector<HTMLElement>('.block-content');
     const text = inner?.textContent ?? '';
@@ -261,7 +339,7 @@ export function Editor({ page }: { page: Page }) {
       inner.innerHTML = escapeHtml(stripped);
       caretToEnd(inner);
     }
-  }, [page.blocks, slash, convertBlock, updateBlock, page.id]);
+  }, [page.blocks, slash, convertBlock, updateBlock, page.id, createPage, setActivePageId]);
 
   const focusPrev = useCallback((blocks: Block[], currentId: string) => {
     const i = blocks.findIndex((x) => x.id === currentId);
@@ -425,22 +503,71 @@ export function Editor({ page }: { page: Page }) {
   };
 
   return (
-    <div className="editor" ref={rootRef} style={{ position: 'relative' }}>
+    <div className={`editor${page.cover ? ' has-cover' : ''}`} ref={rootRef} style={{ position: 'relative' }}>
+      {page.cover && COVER_BY_ID.get(page.cover) && (
+        <div className={`pagecover ${COVER_BY_ID.get(page.cover)!.className}`}>
+          <div className="pagecover__actions">
+            <button className="coverbtn" onClick={() => setCoverOpen(true)}>
+              <Icon name="cover" size={13} /> Cambiar
+            </button>
+            <button className="coverbtn" onClick={() => updatePage(page.id, { cover: undefined })}>
+              <Icon name="x" size={13} /> Quitar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="pagecrumb">
         <Icon name="notebook" size={13} />
         {crumbs.length > 0 ? (
           <>
             {crumbs.map((p) => (
-              <span key={p.id}>
-                <b>{p.title || 'Sin título'}</b> <span aria-hidden="true">›</span>{' '}
-              </span>
+              <button
+                key={p.id}
+                className="crumb-link"
+                onClick={() => setActivePageId(p.id)}
+                title={`Ir a ${p.title || 'Sin título'}`}
+              >
+                {p.title || 'Sin título'}
+              </button>
             ))}
+            <span className="crumb-sep" aria-hidden="true">›</span>
             <span>{page.title || 'Sin título'}</span>
           </>
         ) : (
           <span>Cuaderno <span aria-hidden="true">›</span> {page.title || 'Sin título'}</span>
         )}
         <span style={{ flex: 1 }} />
+        <div className="pagemenu-wrap">
+          <button
+            className="rowaction"
+            title="Más acciones de la página"
+            aria-label="Más acciones de la página"
+            aria-expanded={pageMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => setPageMenuOpen((v) => !v)}
+          >
+            <Icon name="more" size={17} />
+          </button>
+          {pageMenuOpen && (
+            <div className="pagemenu" role="menu" aria-label="Acciones de la página">
+              <button role="menuitem" onClick={() => { duplicatePage(page.id); setPageMenuOpen(false); }}>
+                <Icon name="copy" size={15} /> Duplicar página
+              </button>
+              <button role="menuitem" onClick={() => { setMoveOpen(true); setPageMenuOpen(false); }}>
+                <Icon name="move" size={15} /> Mover a…
+              </button>
+              <button role="menuitem" onClick={() => { setCoverOpen(true); setPageMenuOpen(false); }}>
+                <Icon name="cover" size={15} /> {page.cover ? 'Cambiar portada' : 'Añadir portada'}
+              </button>
+              {page.cover && (
+                <button role="menuitem" onClick={() => { updatePage(page.id, { cover: undefined }); setPageMenuOpen(false); }}>
+                  <Icon name="x" size={15} /> Quitar portada
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         <button className="rowaction" title="Descargar página como Markdown" onClick={() => exportPageMarkdown(page.id)} aria-label="Descargar página como Markdown">
           <Icon name="export" size={15} />
         </button>
@@ -458,18 +585,49 @@ export function Editor({ page }: { page: Page }) {
             className="titleicon"
             style={{ border: 'none', background: 'transparent' }}
             onClick={() => setIconPick((v) => !v)}
-            aria-label="Cambiar icono de página"
+            aria-label="Cambiar sticker de página"
             aria-expanded={iconPick}
           >
-            <Icon name={(page.icon || 'doc') as IconName} size={24} />
+            <Icon name={(page.icon || 'doc') as IconName} size={26} />
           </button>
           {iconPick && (
-            <div className="iconpick" role="menu">
-              {ICON_CHOICES.map((ic) => (
-                <button key={ic} role="menuitem" onClick={() => { updatePage(page.id, { icon: ic }); setIconPick(false); }} aria-label={`Icono ${ic}`}>
-                  <Icon name={ic} size={17} />
-                </button>
-              ))}
+            <div className="iconpick" role="dialog" aria-label="Elegir sticker de página">
+              <div className="iconpick__search">
+                <Icon name="search" size={14} />
+                <input
+                  autoFocus
+                  value={iconQuery}
+                  onChange={(e) => setIconQuery(e.target.value)}
+                  placeholder="Buscar sticker…"
+                  aria-label="Buscar sticker"
+                />
+                <span className="iconpick__count">{iconGroups.reduce((n, g) => n + g.icons.length, 0)}</span>
+              </div>
+              <div className="iconpick__scroll">
+                {iconGroups.map((group) => (
+                  <div key={group.name} className="iconpick__group">
+                    <p className="iconpick__groupname">{group.name}</p>
+                    <div className="iconpick__grid">
+                      {group.icons.map((ic) => (
+                        <button
+                          key={ic.id}
+                          className={page.icon === ic.id ? 'is-sel' : ''}
+                          title={ic.label}
+                          aria-label={`Sticker ${ic.label}`}
+                          onClick={() => {
+                            updatePage(page.id, { icon: ic.id });
+                            setIconPick(false);
+                            setIconQuery('');
+                          }}
+                        >
+                          <Icon name={ic.id} size={19} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {iconGroups.length === 0 && <p className="iconpick__empty">Ningún sticker coincide con “{iconQuery}”.</p>}
+              </div>
             </div>
           )}
         </div>
@@ -486,11 +644,20 @@ export function Editor({ page }: { page: Page }) {
             }
           }}
         />
+        <button
+          className="btn-ghost subpageadd"
+          onClick={createSubpage}
+          title="Crear una página dentro de esta página"
+        >
+          <Icon name="subpage" size={14} /> Subpágina
+        </button>
       </div>
 
       <div className="blocks">
         {visibleBlocks.map((b) => {
-          const key = b.id;
+          // El tipo forma parte de la key: al convertir un bloque, React lo remonta
+          // y no conserva el DOM editable anterior (p. ej. el texto "/toc").
+          const key = `${b.id}:${b.type}`;
           const level = Math.min(4, Math.max(0, b.level));
 
           if (b.type === 'divider') {
@@ -562,6 +729,126 @@ export function Editor({ page }: { page: Page }) {
                       updateBlock(page.id, b.id, { src, fileName, fileSize, fileMime })
                     }
                   />
+                )}
+              </div>
+            );
+          }
+
+          if (b.type === 'toc') {
+            const heads = page.blocks.filter((x) => x.type === 'h1' || x.type === 'h2' || x.type === 'h3');
+            return (
+              <div key={key} className="block block--toc" data-level={level} ref={setBlockRef(b.id)}>
+                <div className="toc">
+                  <div className="toc__head">
+                    <span><Icon name="toc" size={14} /> Tabla de contenido</span>
+                    <button className="rowaction" title="Quitar índice" aria-label="Quitar tabla de contenido" onClick={() => removeBlock(page.id, b.id)}>
+                      <Icon name="x" size={13} />
+                    </button>
+                  </div>
+                  {heads.length > 0 ? (
+                    <div className="toc__list">
+                      {heads.map((h) => (
+                        <button
+                          key={h.id}
+                          className={`toc__item toc__item--${h.type}`}
+                          onClick={() => {
+                            blockEls.current.get(h.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            requestFocus(h.id);
+                          }}
+                        >
+                          {htmlToText(h.html || h.text) || 'Sin título'}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="toc__empty">Añade encabezados H1–H3 y aparecerán aquí.</p>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          if (b.type === 'subpage') {
+            const target = b.pageId ? byId.get(b.pageId) : undefined;
+            const usable = !!target && !target.trashed;
+            return (
+              <div key={key} className="block subpageblock" data-level={level} ref={setBlockRef(b.id)}>
+                <div className={`subpagecard${usable ? '' : ' is-missing'}`}>
+                  <button
+                    className="subpagecard__main"
+                    disabled={!usable}
+                    onClick={() => target && usable && setActivePageId(target.id)}
+                    aria-label={usable ? `Abrir subpágina ${target.title || 'Sin título'}` : 'Subpágina no disponible'}
+                  >
+                    <span className="subpagecard__ic">
+                      <Icon name={((usable && target.icon) || 'subpage') as IconName} size={21} />
+                    </span>
+                    <span className="subpagecard__body">
+                      <span className="subpagecard__title">
+                        {usable ? (target.title || 'Sin título') : 'Subpágina no encontrada'}
+                      </span>
+                      <span className="subpagecard__meta">
+                        {usable
+                          ? `Subpágina · ${childCount(target.id)} ${childCount(target.id) === 1 ? 'hija' : 'hijas'} · editada ${new Date(target.updated).toLocaleDateString('es', { day: 'numeric', month: 'short' })}`
+                          : 'La página se movió a la papelera o se eliminó'}
+                      </span>
+                    </span>
+                    {usable && <Icon name="arrowRight" size={16} />}
+                  </button>
+                  <button
+                    className="rowaction"
+                    title="Quitar tarjeta (la subpágina sigue en el árbol)"
+                    aria-label="Quitar tarjeta de subpágina"
+                    onClick={() => removeBlock(page.id, b.id)}
+                  >
+                    <Icon name="x" size={13} />
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          if (b.type === 'pageLink') {
+            const target = b.pageId ? byId.get(b.pageId) : undefined;
+            const usable = !!target && !target.trashed;
+            return (
+              <div key={key} className="block pagelinkblock" data-level={level} ref={setBlockRef(b.id)}>
+                {!b.pageId || linkPickerFor === b.id ? (
+                  <div className="pagelink-wrap">
+                    <button className="pagelink-open" onClick={() => setLinkPickerFor(b.id)}>
+                      <Icon name="pageLink" size={15} /> {b.pageId ? 'Elegir otra página…' : 'Elegir página…'}
+                    </button>
+                    {linkPickerFor === b.id && (
+                      <PageLinkPicker
+                        pages={pages}
+                        excludeId={page.id}
+                        onPick={(targetId) => {
+                          updateBlock(page.id, b.id, { pageId: targetId });
+                          setLinkPickerFor(null);
+                        }}
+                        onClose={() => setLinkPickerFor(null)}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className={`pagelinkchip${usable ? '' : ' is-missing'}`}>
+                    <button
+                      className="pagelinkchip__main"
+                      disabled={!usable}
+                      onClick={() => usable && target && setActivePageId(target.id)}
+                    >
+                      <span className="pagelinkchip__ic">
+                        <Icon name={((usable && target.icon) || 'pageLink') as IconName} size={16} />
+                      </span>
+                      <span className="pagelinkchip__title">
+                        {usable ? (target.title || 'Sin título') : 'Página no disponible'}
+                      </span>
+                      <span className="pagelinkchip__label">Enlace a página</span>
+                    </button>
+                    <button className="rowaction" title="Quitar enlace" aria-label="Quitar enlace a página" onClick={() => removeBlock(page.id, b.id)}>
+                      <Icon name="x" size={13} />
+                    </button>
+                  </div>
                 )}
               </div>
             );
@@ -672,6 +959,68 @@ export function Editor({ page }: { page: Page }) {
         })}
       </div>
 
+      {extraSubpages.length > 0 && (
+        <section className="childpages" aria-label="Páginas dentro de esta página">
+          <div className="childpages__head">
+            <p className="sectionlabel"><Icon name="subpage" size={14} /> Páginas dentro de esta página</p>
+            <button className="btn-ghost btn-ghost--small" onClick={createSubpage}>
+              <Icon name="plus" size={12} /> Nueva
+            </button>
+          </div>
+          <div className="childgrid">
+            {extraSubpages.map((child) => (
+              <button key={child.id} className="childcard" onClick={() => setActivePageId(child.id)}>
+                <span className="childcard__ic">
+                  <Icon name={(child.icon || 'doc') as IconName} size={18} />
+                </span>
+                <span className="childcard__body">
+                  <span className="childcard__title">{child.title || 'Sin título'}</span>
+                  <span className="childcard__meta">
+                    {childCount(child.id)} {childCount(child.id) === 1 ? 'subpágina' : 'subpáginas'} · {new Date(child.updated).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
+                  </span>
+                </span>
+                <Icon name="arrowRight" size={14} />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {backlinks.length > 0 && (
+        <section className="backlinks" aria-label="Páginas que mencionan esta página">
+          <p className="sectionlabel"><Icon name="backlink" size={14} /> Mencionada en</p>
+          <div className="backlinklist">
+            {backlinks.map((source) => (
+              <button key={source.id} className="backlinkitem" onClick={() => setActivePageId(source.id)}>
+                <Icon name={(source.icon || 'doc') as IconName} size={15} />
+                <span>{source.title || 'Sin título'}</span>
+                <Icon name="arrowRight" size={13} />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {coverOpen && (
+        <CoverPicker
+          current={page.cover}
+          onPick={(cover) => { updatePage(page.id, { cover }); setCoverOpen(false); }}
+          onRemove={() => { updatePage(page.id, { cover: undefined }); setCoverOpen(false); }}
+          onClose={() => setCoverOpen(false)}
+        />
+      )}
+
+      {moveOpen && (
+        <MoveDialog
+          page={page}
+          pages={pages}
+          onMove={(parentId) => {
+            if (movePage(page.id, parentId)) setMoveOpen(false);
+          }}
+          onClose={() => setMoveOpen(false)}
+        />
+      )}
+
       {slash && (
         <SlashMenu
           query={slash.query}
@@ -681,6 +1030,225 @@ export function Editor({ page }: { page: Page }) {
           style={{ top: slashPos.top, left: slashPos.left }}
         />
       )}
+    </div>
+  );
+}
+
+function descendantIds(pages: Page[], rootId: string): Set<string> {
+  const ids = new Set<string>([rootId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const p of pages) {
+      if (p.parentId && ids.has(p.parentId) && !ids.has(p.id)) {
+        ids.add(p.id);
+        grew = true;
+      }
+    }
+  }
+  return ids;
+}
+
+function PageLinkPicker({
+  pages,
+  excludeId,
+  onPick,
+  onClose,
+}: {
+  pages: Page[];
+  excludeId: string;
+  onPick: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const items = pages
+    .filter((p) => p.id !== excludeId && !p.trashed)
+    .filter((p) => !q || `${p.title || 'Sin título'}`.toLowerCase().includes(q))
+    .slice(0, 8);
+
+  return (
+    <div className="pagelink-picker" role="dialog" aria-label="Elegir una página para enlazar">
+      <div className="pagelink-picker__search">
+        <Icon name="search" size={13} />
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar página…"
+          aria-label="Buscar página para enlazar"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') onClose();
+            if (e.key === 'Enter' && items[0]) onPick(items[0].id);
+          }}
+        />
+      </div>
+      <div className="pagelink-picker__list">
+        {items.length === 0 && <p className="pagelink-picker__empty">No hay otra página con ese nombre.</p>}
+        {items.map((p) => (
+          <button key={p.id} onClick={() => onPick(p.id)}>
+            <Icon name={(p.icon || 'doc') as IconName} size={14} />
+            <span>{p.title || 'Sin título'}</span>
+            <Icon name="arrowRight" size={12} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CoverPicker({
+  current,
+  onPick,
+  onRemove,
+  onClose,
+}: {
+  current?: string;
+  onPick: (id: string) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose} role="dialog" aria-modal="true" aria-label="Elegir portada">
+      <div className="modal coverpick" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal__head">
+          <div>
+            <p className="kicker">Portada de página</p>
+            <h2>Elige un tono.</h2>
+          </div>
+          <button className="rowaction" onClick={onClose} aria-label="Cerrar">
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+        <p className="modal__lede">Portadas dibujadas con los cuatro matices del cuaderno. Sin imágenes externas.</p>
+        <div className="covergrid">
+          {COVERS.map((cover) => (
+            <button
+              key={cover.id}
+              className={`coverchoice${current === cover.id ? ' is-sel' : ''}`}
+              onClick={() => onPick(cover.id)}
+              aria-label={`Portada ${cover.label}`}
+            >
+              <span className={`coverswatch ${cover.className}`} />
+              <span>{cover.label}</span>
+              {current === cover.id && <Icon name="check" size={14} />}
+            </button>
+          ))}
+        </div>
+        {current && (
+          <button className="btn-ghost modal__remove" onClick={onRemove}>
+            <Icon name="x" size={13} /> Quitar portada
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MoveDialog({
+  page,
+  pages,
+  onMove,
+  onClose,
+}: {
+  page: Page;
+  pages: Page[];
+  onMove: (parentId: string | null) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const blocked = useMemo(() => descendantIds(pages, page.id), [pages, page.id]);
+  const tree = useMemo(() => {
+    const byParent = new Map<string | null, Page[]>();
+    for (const p of pages) {
+      if (p.trashed) continue;
+      const key = p.parentId;
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key)!.push(p);
+    }
+    const out: { page: Page; depth: number }[] = [];
+    const walk = (parentId: string | null, depth: number) => {
+      for (const p of byParent.get(parentId) ?? []) {
+        out.push({ page: p, depth });
+        walk(p.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [pages]);
+
+  const q = query.trim().toLowerCase();
+  const items = tree.filter(
+    ({ page: p }) => !blocked.has(p.id) && (!q || `${p.title || 'Sin título'}`.toLowerCase().includes(q)),
+  );
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose} role="dialog" aria-modal="true" aria-label="Mover página">
+      <div className="modal movepick" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal__head">
+          <div>
+            <p className="kicker">Mover página</p>
+            <h2>¿Dónde va «{page.title || 'Sin título'}»?</h2>
+          </div>
+          <button className="rowaction" onClick={onClose} aria-label="Cerrar">
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+        <div className="movepick__search">
+          <Icon name="search" size={14} />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar una página de destino…"
+            aria-label="Buscar página de destino"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onClose();
+              if (e.key === 'Enter' && items[0]) onMove(items[0].page.id);
+            }}
+          />
+        </div>
+        <div className="movepick__list" role="listbox" aria-label="Páginas de destino">
+          <button
+            className={`movepick__item${page.parentId === null ? ' is-current' : ''}`}
+            onClick={() => onMove(null)}
+          >
+            <Icon name="notebook" size={15} />
+            <span>Nivel raíz del cuaderno</span>
+            {page.parentId === null && <Icon name="check" size={13} />}
+          </button>
+          {items.map(({ page: p, depth }) => (
+            <button
+              key={p.id}
+              className={`movepick__item${page.parentId === p.id ? ' is-current' : ''}`}
+              style={{ paddingLeft: `${12 + depth * 16}px` }}
+              onClick={() => onMove(p.id)}
+            >
+              <Icon name={(p.icon || 'doc') as IconName} size={14} />
+              <span>{p.title || 'Sin título'}</span>
+              {page.parentId === p.id && <Icon name="check" size={13} />}
+            </button>
+          ))}
+          {items.length === 0 && <p className="movepick__empty">No hay destinos con ese nombre.</p>}
+        </div>
+        <p className="modal__hint">Una página no puede moverse dentro de sí misma ni de sus subpáginas.</p>
+      </div>
     </div>
   );
 }

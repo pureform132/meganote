@@ -48,14 +48,28 @@ Notion es extraordinario, pero para muchas personas es demasiado: cuenta obligat
 |---|---|
 | ![Selector de workspaces con Personal y Trabajo](docs/screenshots/workspaces.png) | ![Vista de calendario mensual con filas por fecha](docs/screenshots/db-calendar.png) |
 
+| Galería de base de datos | Gráfico donut |
+|---|---|
+| ![Vista de galería con tarjetas, estados y fechas](docs/screenshots/gallery.png) | ![Gráfico donut con leyenda y porcentajes](docs/screenshots/chart-donut.png) |
+
+| 43 stickers para el encabezado | Tabla de contenido |
+|---|---|
+| ![Selector de stickers con buscador y grupos](docs/screenshots/stickers.png) | ![Bloque de tabla de contenido con encabezados navegables](docs/screenshots/toc.png) |
+
 ## Funciones
 
 - **Editor de bloques** — texto, H1–H3, listas, to-dos, toggles, citas, código, destacados, divisores, imágenes y adjuntos de cualquier tipo.
-- **Menú `/`** — 14 tipos de bloque, navegable con teclado.
+- **Subpáginas** — crea una página dentro de otra desde el encabezado o con `/subpágina`; la tarjeta muestra su icono, título y número de hijas.
+- **Stickers y portadas** — 43 iconos propios con buscador y seis portadas planas de la paleta.
+- **Tabla de contenido** — `/toc` genera un índice navegable desde los encabezados H1–H3.
+- **Duplicar y mover** — copia una página con todo su subárbol o muévela con un buscador de destinos.
+- **Enlaces y backlinks** — menciona páginas con `/enlace` y descubre quién te menciona en «Mencionada en».
+- **Menú `/`** — 18 tipos de bloque, navegable con teclado.
 - **Formato inline** — `Ctrl+B` negrita, `Ctrl+I` itálica, `Ctrl+Shift+X` tachado, `Ctrl+\`` código.
 - **Atajos Markdown** — `#`, `##`, `###`, `-`, `1.`, `[]`, `>`, ` ``` ` al inicio de un bloque.
 - **Páginas dentro de páginas** — árbol sin límite, favoritos y papelera reversible.
-- **Bases de datos** — texto, número, selección, fecha y casilla; vistas **tabla**, **kanban**, **calendario** y **gráfico**; filtros, orden y agrupación.
+- **Bases de datos** — texto, número, selección, fecha y casilla; cinco vistas: **tabla**, **kanban**, **calendario**, **galería** y **gráfico**.
+- **Gráficos** — barras, horizontal, líneas/área y donut; agrupa por selección, fecha, casilla o texto y elige recuento, suma o media.
 - **Búsqueda a texto completo** — `Ctrl/Cmd+K` sobre títulos, bloques y filas de bases de datos.
 - **Varios workspaces** — cuadernos separados (Personal, Trabajo, …) con su propio árbol.
 - **Importar desde Notion** — el export oficial **Markdown y CSV**: páginas, jerarquía, bases de datos e imágenes.
