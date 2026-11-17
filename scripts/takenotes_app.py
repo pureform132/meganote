@@ -1,6 +1,6 @@
-"""Takenotes desktop launcher — hosts the web build in a native WebView2 window.
+"""Lanzador de escritorio de Takenotes — sirve el build web en una ventana nativa WebView2.
 
-Data (IndexedDB, caches) persists in %APPDATA%\\Takenotes so notes survive restarts.
+Los datos (IndexedDB, cachés) viven en %APPDATA%\\Takenotes para que las notas sobrevivan al cierre.
 """
 import os
 import sys
@@ -18,7 +18,7 @@ def main() -> None:
     data_dir = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'Takenotes')
     os.makedirs(data_dir, exist_ok=True)
     webview.create_window(
-        'Takenotes — your notes, on paper',
+        'Takenotes — tus notas, en papel',
         url=html_url,
         width=1440,
         height=900,
