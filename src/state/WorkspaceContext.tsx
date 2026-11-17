@@ -46,7 +46,7 @@ export interface WorkspaceContextValue {
   trashCount: number;
   trashedPages: Page[];
 
-  addBlock: (pageId: string, block: Block) => void;
+  addBlock: (pageId: string, block: Block, index?: number) => void;
   updateBlock: (pageId: string, blockId: string, patch: Partial<Block>) => void;
   removeBlock: (pageId: string, blockId: string) => void;
   splitBlock: (pageId: string, blockId: string, beforeHtml: string, beforeText: string, afterHtml: string, afterText: string) => string;
@@ -322,9 +322,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [updateCurrent]);
 
   const addBlock = useCallback(
-    (pageId: string, block: Block) => {
+    (pageId: string, block: Block, index?: number) => {
       updateCurrent((prev) =>
-        prev.map((p) => (p.id === pageId ? { ...p, blocks: [...p.blocks, block], updated: now() } : p)),
+        prev.map((p) => {
+          if (p.id !== pageId) return p;
+          const blocks = [...p.blocks];
+          const at = index === undefined ? blocks.length : Math.max(0, Math.min(index, blocks.length));
+          blocks.splice(at, 0, block);
+          return { ...p, blocks, updated: now() };
+        }),
       );
     },
     [updateCurrent],

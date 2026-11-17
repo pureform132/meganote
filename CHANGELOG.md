@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.2.0] — 2026-11-17
+
+### Añadido
+
+- **Clic en cualquier espacio libre** para crear un bloque de texto y escribir, como en Notion; el papel bajo el contenido es ahora una zona de escritura.
+- **Arrastrar y soltar páginas**: desde el árbol lateral, las tarjetas de subpágina, los enlaces de página o las migas de pan.
+- Al soltar sobre el **papel de una página**, la página arrastrada se convierte en subpágina y aparece como tarjeta en el punto de destino.
+- Al soltar sobre una **fila del árbol**, una **tarjeta** o una **miga**, la página se anida bajo ese destino.
+- Al soltar sobre una **base de datos**, la página pasa a ser su subpágina.
+- Avisos de confirmación, resaltado del destino y protección contra mover una página dentro de sí misma o de sus descendientes.
+
 ## [1.1.0] — 2026-11-17
 
 ### Añadido

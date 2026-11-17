@@ -5,6 +5,7 @@ import { useWorkspace } from '../state/WorkspaceContext';
 import { Icon, type IconName } from '../lib/icons';
 import { sanitizeInline, htmlToText, escapeHtml } from '../lib/html';
 import { COVERS, COVER_BY_ID, searchPageIcons } from '../lib/pageIcons';
+import { getPageDrag, hasPageDrag, setPageDrag } from '../lib/pageDrag';
 import { SlashMenu, SLASH_COMMANDS, type SlashCommand } from './SlashMenu';
 import { newId, type Block, type BlockType, type Page } from '../lib/types';
 
@@ -110,6 +111,8 @@ export function Editor({ page }: { page: Page }) {
   const [pageMenuOpen, setPageMenuOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [linkPickerFor, setLinkPickerFor] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [dropNotice, setDropNotice] = useState<string | null>(null);
   const [dividerSel, setDividerSel] = useState<string | null>(null);
   const [imageErr, setImageErr] = useState<Record<string, string>>({});
   const [slashPos, setSlashPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -188,6 +191,90 @@ export function Editor({ page }: { page: Page }) {
     });
     setActivePageId(childId);
   }, [addBlock, createPage, page.id, setActivePageId]);
+
+  useEffect(() => {
+    if (!dropNotice) return;
+    const timer = window.setTimeout(() => setDropNotice(null), 3600);
+    return () => window.clearTimeout(timer);
+  }, [dropNotice]);
+
+  /** Clic en el papel libre: como en Notion, escribe donde has hecho clic. */
+  const addParagraph = useCallback(() => {
+    const last = page.blocks[page.blocks.length - 1];
+    if (last && last.type === 'text' && !last.text.trim() && !last.html.trim()) {
+      requestFocus(last.id);
+      return;
+    }
+    const block: Block = { id: newId(), type: 'text', text: '', html: '', level: 0 };
+    addBlock(page.id, block);
+    requestFocus(block.id);
+  }, [addBlock, page.blocks, page.id, requestFocus]);
+
+  /** Índice de inserción a partir de la posición vertical del cursor de arrastre. */
+  const dropIndex = useCallback(
+    (e: React.DragEvent): number => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>('[data-block-id]');
+      if (!el?.dataset.blockId) return page.blocks.length;
+      const index = page.blocks.findIndex((b) => b.id === el.dataset.blockId);
+      if (index < 0) return page.blocks.length;
+      const rect = el.getBoundingClientRect();
+      return index + (e.clientY > rect.top + rect.height / 2 ? 1 : 0);
+    },
+    [page.blocks],
+  );
+
+  const dropPageHere = useCallback(
+    (draggedId: string, index: number) => {
+      if (!draggedId || draggedId === page.id) {
+        setDropNotice('Una página no puede ser subpágina de sí misma.');
+        return;
+      }
+      const target = byId.get(draggedId);
+      if (!target) return;
+      if (!movePage(draggedId, page.id)) {
+        setDropNotice('No puedes mover una página dentro de una de sus propias subpáginas.');
+        return;
+      }
+      const existing = page.blocks.find((b) => b.type === 'subpage' && b.pageId === draggedId);
+      if (existing) {
+        blockEls.current.get(existing.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        addBlock(
+          page.id,
+          { id: newId(), type: 'subpage', pageId: draggedId, text: '', html: '', level: 0 },
+          index,
+        );
+      }
+      setDropNotice(`«${target.title || 'Sin título'}» ahora es una subpágina de «${page.title || 'Sin título'}».`);
+    },
+    [addBlock, byId, movePage, page.blocks, page.id, page.title],
+  );
+
+  const onEditorDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!hasPageDrag(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDragOver(true);
+    },
+    [],
+  );
+
+  const onEditorDragLeave = useCallback((e: React.DragEvent) => {
+    const next = e.relatedTarget as Node | null;
+    if (!next || !e.currentTarget.contains(next)) setDragOver(false);
+  }, []);
+
+  const onEditorDrop = useCallback(
+    (e: React.DragEvent) => {
+      const draggedId = getPageDrag(e);
+      if (!draggedId) return;
+      e.preventDefault();
+      setDragOver(false);
+      dropPageHere(draggedId, dropIndex(e));
+    },
+    [dropIndex, dropPageHere],
+  );
 
   // gestión del foco
   useEffect(() => {
@@ -503,7 +590,14 @@ export function Editor({ page }: { page: Page }) {
   };
 
   return (
-    <div className={`editor${page.cover ? ' has-cover' : ''}`} ref={rootRef} style={{ position: 'relative' }}>
+    <div
+      className={`editor${page.cover ? ' has-cover' : ''}${dragOver ? ' is-page-drop' : ''}`}
+      ref={rootRef}
+      style={{ position: 'relative' }}
+      onDragOver={onEditorDragOver}
+      onDragLeave={onEditorDragLeave}
+      onDrop={onEditorDrop}
+    >
       {page.cover && COVER_BY_ID.get(page.cover) && (
         <div className={`pagecover ${COVER_BY_ID.get(page.cover)!.className}`}>
           <div className="pagecover__actions">
@@ -525,8 +619,23 @@ export function Editor({ page }: { page: Page }) {
               <button
                 key={p.id}
                 className="crumb-link"
+                draggable
+                onDragStart={(e) => setPageDrag(e, p.id)}
+                onDragOver={(e) => {
+                  if (hasPageDrag(e)) { e.preventDefault(); e.stopPropagation(); }
+                }}
+                onDrop={(e) => {
+                  const draggedId = getPageDrag(e);
+                  if (!draggedId) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (draggedId === p.id) return;
+                  if (movePage(draggedId, p.id)) {
+                    setDropNotice(`«${byId.get(draggedId)?.title || 'Sin título'}» se movió dentro de «${p.title || 'Sin título'}».`);
+                  }
+                }}
                 onClick={() => setActivePageId(p.id)}
-                title={`Ir a ${p.title || 'Sin título'}`}
+                title={`Ir a ${p.title || 'Sin título'} · arrastra para mover`}
               >
                 {p.title || 'Sin título'}
               </button>
@@ -662,7 +771,7 @@ export function Editor({ page }: { page: Page }) {
 
           if (b.type === 'divider') {
             return (
-              <div key={key} className="block" data-level={level}>
+              <div key={key} className="block" data-level={level} data-block-id={b.id}>
                 <button
                   className={`divider-row${dividerSel === b.id ? ' is-selected' : ''}`}
                   onClick={() => setDividerSel(b.id)}
@@ -676,7 +785,7 @@ export function Editor({ page }: { page: Page }) {
 
           if (b.type === 'image') {
             return (
-              <div key={key} className="block imgblock" data-level={level} ref={setBlockRef(b.id)}>
+              <div key={key} className="block imgblock" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                 {b.src ? (
                   <figure>
                     <img src={b.src} alt={b.alt ?? ''} />
@@ -706,7 +815,7 @@ export function Editor({ page }: { page: Page }) {
 
           if (b.type === 'file') {
             return (
-              <div key={key} className="block fileblock" data-level={level} ref={setBlockRef(b.id)}>
+              <div key={key} className="block fileblock" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                 {b.src ? (
                   <div className="filechip">
                     <span className="filechip__ic"><Icon name="file" size={20} /></span>
@@ -737,7 +846,7 @@ export function Editor({ page }: { page: Page }) {
           if (b.type === 'toc') {
             const heads = page.blocks.filter((x) => x.type === 'h1' || x.type === 'h2' || x.type === 'h3');
             return (
-              <div key={key} className="block block--toc" data-level={level} ref={setBlockRef(b.id)}>
+              <div key={key} className="block block--toc" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                 <div className="toc">
                   <div className="toc__head">
                     <span><Icon name="toc" size={14} /> Tabla de contenido</span>
@@ -772,11 +881,32 @@ export function Editor({ page }: { page: Page }) {
             const target = b.pageId ? byId.get(b.pageId) : undefined;
             const usable = !!target && !target.trashed;
             return (
-              <div key={key} className="block subpageblock" data-level={level} ref={setBlockRef(b.id)}>
-                <div className={`subpagecard${usable ? '' : ' is-missing'}`}>
+              <div key={key} className="block subpageblock" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
+                <div
+                  className={`subpagecard${usable ? '' : ' is-missing'}`}
+                  onDragOver={(e) => {
+                    if (!usable || !target) return;
+                    if (hasPageDrag(e)) { e.preventDefault(); e.stopPropagation(); }
+                  }}
+                  onDrop={(e) => {
+                    if (!usable || !target) return;
+                    const draggedId = getPageDrag(e);
+                    if (!draggedId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (draggedId === target.id) return;
+                    if (!movePage(draggedId, target.id)) {
+                      setDropNotice('No puedes mover una página dentro de sí misma.');
+                      return;
+                    }
+                    setDropNotice(`«${byId.get(draggedId)?.title || 'Sin título'}» ahora vive dentro de «${target.title || 'Sin título'}».`);
+                  }}
+                >
                   <button
                     className="subpagecard__main"
                     disabled={!usable}
+                    draggable={usable}
+                    onDragStart={(e) => target && setPageDrag(e, target.id)}
                     onClick={() => target && usable && setActivePageId(target.id)}
                     aria-label={usable ? `Abrir subpágina ${target.title || 'Sin título'}` : 'Subpágina no disponible'}
                   >
@@ -812,7 +942,7 @@ export function Editor({ page }: { page: Page }) {
             const target = b.pageId ? byId.get(b.pageId) : undefined;
             const usable = !!target && !target.trashed;
             return (
-              <div key={key} className="block pagelinkblock" data-level={level} ref={setBlockRef(b.id)}>
+              <div key={key} className="block pagelinkblock" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                 {!b.pageId || linkPickerFor === b.id ? (
                   <div className="pagelink-wrap">
                     <button className="pagelink-open" onClick={() => setLinkPickerFor(b.id)}>
@@ -831,10 +961,31 @@ export function Editor({ page }: { page: Page }) {
                     )}
                   </div>
                 ) : (
-                  <div className={`pagelinkchip${usable ? '' : ' is-missing'}`}>
+                  <div
+                    className={`pagelinkchip${usable ? '' : ' is-missing'}`}
+                    onDragOver={(e) => {
+                      if (!usable || !target) return;
+                      if (hasPageDrag(e)) { e.preventDefault(); e.stopPropagation(); }
+                    }}
+                    onDrop={(e) => {
+                      if (!usable || !target) return;
+                      const draggedId = getPageDrag(e);
+                      if (!draggedId) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (draggedId === target.id) return;
+                      if (!movePage(draggedId, target.id)) {
+                        setDropNotice('No puedes mover una página dentro de sí misma.');
+                        return;
+                      }
+                      setDropNotice(`«${byId.get(draggedId)?.title || 'Sin título'}» ahora vive dentro de «${target.title || 'Sin título'}».`);
+                    }}
+                  >
                     <button
                       className="pagelinkchip__main"
                       disabled={!usable}
+                      draggable={usable}
+                      onDragStart={(e) => target && setPageDrag(e, target.id)}
                       onClick={() => usable && target && setActivePageId(target.id)}
                     >
                       <span className="pagelinkchip__ic">
@@ -873,21 +1024,21 @@ export function Editor({ page }: { page: Page }) {
           switch (b.type) {
             case 'bulleted':
               return (
-                <div key={key} className="block block--bulleted" data-level={level} ref={setBlockRef(b.id)}>
+                <div key={key} className="block block--bulleted" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                   <span className="bulleted-dot" aria-hidden="true"><i /></span>
                   {content}
                 </div>
               );
             case 'numbered':
               return (
-                <div key={key} className="block block--numbered" data-level={level} ref={setBlockRef(b.id)}>
+                <div key={key} className="block block--numbered" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                   <span className="listitem-marker" aria-hidden="true">{numbering.get(b.id)}.</span>
                   {content}
                 </div>
               );
             case 'todo':
               return (
-                <div key={key} className="block block--todo" data-level={level} ref={setBlockRef(b.id)}>
+                <div key={key} className="block block--todo" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                   <button
                     className={`todocheck${b.checked ? ' is-checked' : ''}`}
                     onClick={() => updateBlock(page.id, b.id, { checked: !b.checked })}
@@ -904,7 +1055,7 @@ export function Editor({ page }: { page: Page }) {
               );
             case 'toggle':
               return (
-                <div key={key} className="block block--toggle" data-level={level} ref={setBlockRef(b.id)}>
+                <div key={key} className="block block--toggle" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                   <button
                     className="togglebtn"
                     data-open={b.open !== false}
@@ -919,13 +1070,13 @@ export function Editor({ page }: { page: Page }) {
               );
             case 'quote':
               return (
-                <div key={key} className="block block--quote" data-level={level} ref={setBlockRef(b.id)}>
+                <div key={key} className="block block--quote" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                   {content}
                 </div>
               );
             case 'callout':
               return (
-                <div key={key} className="block block--callout" data-level={level} ref={setBlockRef(b.id)}>
+                <div key={key} className="block block--callout" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                   <div className="block-body">
                     <Icon name="info" size={17} className="callout-ic" />
                     {content}
@@ -934,7 +1085,7 @@ export function Editor({ page }: { page: Page }) {
               );
             case 'code':
               return (
-                <div key={key} className="block block--code" data-level={level} ref={setBlockRef(b.id)}>
+                <div key={key} className="block block--code" data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                   <div className="codehead">
                     <input
                       className="codelang"
@@ -950,7 +1101,7 @@ export function Editor({ page }: { page: Page }) {
             default: {
               const cls = b.type === 'text' ? '' : b.type;
               return (
-                <div key={key} className={`block ${cls ? `block--${cls}` : ''}`} data-level={level} ref={setBlockRef(b.id)}>
+                <div key={key} className={`block ${cls ? `block--${cls}` : ''}`} data-level={level} data-block-id={b.id} ref={setBlockRef(b.id)}>
                   {content}
                 </div>
               );
@@ -1001,6 +1152,24 @@ export function Editor({ page }: { page: Page }) {
         </section>
       )}
 
+      <div
+        className={`pagepad${page.blocks.length === 0 ? ' is-empty' : ''}`}
+        onClick={addParagraph}
+        role="button"
+        tabIndex={0}
+        aria-label="Hacer clic para escribir un bloque nuevo"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            addParagraph();
+          }
+        }}
+      >
+        <span className="pagepad__hint">
+          <Icon name="plus" size={13} /> Haz clic en cualquier espacio libre para escribir…
+        </span>
+      </div>
+
       {coverOpen && (
         <CoverPicker
           current={page.cover}
@@ -1019,6 +1188,12 @@ export function Editor({ page }: { page: Page }) {
           }}
           onClose={() => setMoveOpen(false)}
         />
+      )}
+
+      {dropNotice && (
+        <div className="dropnotice" role="status" aria-live="polite">
+          <Icon name="subpage" size={14} /> {dropNotice}
+        </div>
       )}
 
       {slash && (

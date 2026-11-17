@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Icon, type IconName } from '../lib/icons';
+import { getPageDrag, hasPageDrag, setPageDrag } from '../lib/pageDrag';
 import { parseNotionExport } from '../lib/notionImport';
 import { currentTheme, toggleTheme, type Theme } from '../lib/theme';
 import type { Page } from '../lib/types';
@@ -17,12 +18,13 @@ function loadExpanded(): Set<string> {
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const {
-    pages, activePageId, setActivePageId, createPage, toggleFavorite, trashPage,
+    pages, byId, activePageId, setActivePageId, createPage, movePage, toggleFavorite, trashPage,
     setSearchOpen, setShowTrash, showTrash, trashCount,
     notebooks, currentNotebookId, currentNotebookName, setCurrentNotebook, createNotebook, renameNotebook,
     exportBackup, importBackup, importPages, saveState, savedAt,
   } = useWorkspace();
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
+  const [dropId, setDropId] = useState<string | null>(null);
 
   const [wsMenuOpen, setWsMenuOpen] = useState(false);
   const [creatingWs, setCreatingWs] = useState(false);
@@ -114,6 +116,44 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     setWsMenuOpen(false);
   };
 
+  const moveInto = (targetId: string, e: DragEvent) => {
+    const draggedId = getPageDrag(e);
+    if (!draggedId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropId(null);
+    if (draggedId === targetId) return;
+    const dragged = byId.get(draggedId);
+    const target = byId.get(targetId);
+    if (!dragged || !target) return;
+    if (dragged.parentId === targetId) {
+      setExpanded((prev) => new Set(prev).add(targetId));
+      setNotice({ kind: 'ok', text: `«${dragged.title || 'Sin título'}» ya está dentro de «${target.title || 'Sin título'}».` });
+      return;
+    }
+    if (!movePage(draggedId, targetId)) {
+      setNotice({ kind: 'err', text: 'No puedes mover una página dentro de sí misma ni de una de sus subpáginas.' });
+      return;
+    }
+    setExpanded((prev) => new Set(prev).add(targetId));
+    setNotice({ kind: 'ok', text: `«${dragged.title || 'Sin título'}» ahora es una subpágina de «${target.title || 'Sin título'}».` });
+  };
+
+  const dropProps = (targetId: string) => ({
+    onDragOver: (e: DragEvent) => {
+      if (!hasPageDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      setDropId(targetId);
+    },
+    onDragLeave: (e: DragEvent) => {
+      const next = e.relatedTarget as Node | null;
+      if (!next || !e.currentTarget.contains(next)) setDropId((current) => (current === targetId ? null : current));
+    },
+    onDrop: (e: DragEvent) => moveInto(targetId, e),
+  });
+
   const renderTree = (parentId: string | null, depth: number) => {
     const kids = childrenOf.get(parentId) ?? [];
     return kids.map((p) => {
@@ -123,8 +163,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       return (
         <div key={p.id} role="treeitem" aria-expanded={hasKids ? isOpen : undefined}>
           <button
-            className={`treerow${activePageId === p.id && !showTrash ? ' is-active' : ''}`}
+            className={`treerow${activePageId === p.id && !showTrash ? ' is-active' : ''}${dropId === p.id ? ' is-drop' : ''}`}
             style={{ paddingLeft: `${2 + depth * 14}px` }}
+            data-page-id={p.id}
+            draggable
+            onDragStart={(e) => setPageDrag(e, p.id)}
+            {...dropProps(p.id)}
             onClick={() => {
               setActivePageId(p.id);
               setShowTrash(false);
@@ -323,8 +367,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                 {favorites.map((p) => (
                   <button
                     key={p.id}
-                    className={`treerow${activePageId === p.id && !showTrash ? ' is-active' : ''}`}
+                    className={`treerow${activePageId === p.id && !showTrash ? ' is-active' : ''}${dropId === p.id ? ' is-drop' : ''}`}
                     style={{ paddingLeft: '4px' }}
+                    data-page-id={p.id}
+                    draggable
+                    onDragStart={(e) => setPageDrag(e, p.id)}
+                    {...dropProps(p.id)}
                     onClick={() => {
                       setActivePageId(p.id);
                       setShowTrash(false);

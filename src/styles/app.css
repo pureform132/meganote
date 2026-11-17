@@ -1208,3 +1208,79 @@ tr:hover .rowdel { visibility: visible; }
   .viewtabs { max-width: 100%; overflow-x: auto; }
   .subpageadd { margin-left: 0; }
 }
+
+/* ============================================================
+   CLICK-ANYWHERE + PAGE DRAG & DROP
+   ============================================================ */
+
+/* Clicking the free paper creates a paragraph, like Notion. */
+.editor {
+  display: flex; flex-direction: column;
+  min-height: calc(100vh - 40px);
+}
+.editor .blocks { flex: 0 0 auto; }
+.pagepad {
+  flex: 1 1 auto; min-height: 160px; margin-top: 6px;
+  border-radius: var(--r-control); cursor: text;
+  transition: background .18s var(--ease-out);
+}
+.pagepad:hover { background: color-mix(in oklab, var(--sage) 5%, transparent); }
+.pagepad__hint {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 12px 0 0 2px; font-size: 12px; color: var(--ink-38);
+  opacity: 0; transition: opacity .18s var(--ease-out);
+  pointer-events: none;
+}
+.pagepad:hover .pagepad__hint,
+.pagepad:focus-visible .pagepad__hint,
+.pagepad.is-empty .pagepad__hint { opacity: 1; }
+.pagepad:focus-visible { outline: 2px solid var(--terra); outline-offset: 2px; }
+
+/* Drop a page anywhere in the editor or a database. */
+.editor.is-page-drop,
+.dbwrap.is-page-drop {
+  outline: 1.5px dashed color-mix(in oklab, var(--terra) 50%, transparent);
+  outline-offset: 10px; border-radius: var(--r-container);
+  background: color-mix(in oklab, var(--terra) 3.5%, transparent);
+}
+.editor.is-page-drop .pagepad { background: color-mix(in oklab, var(--sage) 10%, transparent); }
+
+/* Sidebar rows are both drag sources and drop targets. */
+.treerow[draggable="true"] { cursor: grab; }
+.treerow[draggable="true"]:active { cursor: grabbing; }
+.treerow.is-drop {
+  background: var(--sage-soft) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--sage) 55%, transparent);
+}
+.treerow.is-drop .treerow__title { color: var(--sage-deep); }
+.subpagecard[draggable="true"],
+.subpagecard__main[draggable="true"],
+.pagelinkchip__main[draggable="true"],
+.crumb-link[draggable="true"] { cursor: grab; }
+.subpagecard__main:active,
+.pagelinkchip__main:active,
+.crumb-link:active { cursor: grabbing; }
+
+/* Transient confirmation after a drop. */
+.dropnotice {
+  position: fixed; left: 50%; bottom: 26px; z-index: 230;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  max-width: min(620px, calc(100vw - 32px));
+  background: var(--ink); color: var(--paper);
+  border-radius: 999px; padding: 9px 16px;
+  font-size: 12px; font-weight: 500; line-height: 1.35;
+  box-shadow: 0 10px 30px -12px color-mix(in oklab, var(--ink) 70%, transparent);
+  animation: dropin .22s var(--ease-out);
+  pointer-events: none;
+}
+.dropnotice svg { color: var(--sage); flex: none; }
+@keyframes dropin {
+  from { opacity: 0; transform: translate(-50%, 10px) scale(.97); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@media (max-width: 900px) {
+  .pagepad { min-height: 100px; }
+  .dropnotice { bottom: 18px; font-size: 11.5px; }
+}

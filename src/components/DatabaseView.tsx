@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Icon, type IconName } from '../lib/icons';
+import { getPageDrag, hasPageDrag } from '../lib/pageDrag';
 import { newId, type ChartKind, type DBColumn, type DBRow, type DBView, type Page, type PropertyType } from '../lib/types';
 
 const TONE_BY_INDEX = ['ink', 'terra', 'sage'] as const;
@@ -18,8 +19,10 @@ function cellText(row: DBRow, col: DBColumn): string {
 }
 
 export function DatabaseView({ page }: { page: Page }) {
-  const { updateDB, updatePage, toggleFavorite, trashPage } = useWorkspace();
+  const { updateDB, updatePage, toggleFavorite, trashPage, movePage, byId } = useWorkspace();
   const db = page.db!;
+  const [dragOver, setDragOver] = useState(false);
+  const [dropNotice, setDropNotice] = useState<string | null>(null);
   const [addPropOpen, setAddPropOpen] = useState(false);
   const [openCell, setOpenCell] = useState<string | null>(null); // `${rowId}:${colId}`
   const [renamingCol, setRenamingCol] = useState<string | null>(null);
@@ -29,6 +32,12 @@ export function DatabaseView({ page }: { page: Page }) {
   const cellPopRef = useRef<HTMLDivElement>(null);
   const dragRow = useRef<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dropNotice) return;
+    const timer = window.setTimeout(() => setDropNotice(null), 3600);
+    return () => window.clearTimeout(timer);
+  }, [dropNotice]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -140,7 +149,31 @@ export function DatabaseView({ page }: { page: Page }) {
   const firstColId = db.columns[0]?.id;
 
   return (
-    <div className="dbwrap">
+    <div
+      className={`dbwrap${dragOver ? ' is-page-drop' : ''}`}
+      onDragOver={(e) => {
+        if (!hasPageDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        const next = e.relatedTarget as Node | null;
+        if (!next || !e.currentTarget.contains(next)) setDragOver(false);
+      }}
+      onDrop={(e) => {
+        const draggedId = getPageDrag(e);
+        if (!draggedId) return;
+        e.preventDefault();
+        setDragOver(false);
+        if (draggedId === page.id) return;
+        if (!movePage(draggedId, page.id)) {
+          setDropNotice('No puedes mover una página dentro de sí misma ni de sus subpáginas.');
+          return;
+        }
+        setDropNotice(`«${byId.get(draggedId)?.title || 'Sin título'}» ahora vive dentro de esta base de datos.`);
+      }}
+    >
       {/* encabezado editable */}
       <div className="titlerow" style={{ marginBottom: 14 }}>
         <div className="titleicon" aria-hidden="true" style={{ width: 44, height: 44 }}>
@@ -468,6 +501,12 @@ export function DatabaseView({ page }: { page: Page }) {
       <p style={{ marginTop: 14, fontSize: 11, color: 'var(--ink-38)' }}>
         {db.rows.length} {db.rows.length === 1 ? 'fila' : 'filas'} · guardado localmente{db.filter.trim() ? ' · filtrado' : ''}
       </p>
+
+      {dropNotice && (
+        <div className="dropnotice" role="status" aria-live="polite">
+          <Icon name="subpage" size={14} /> {dropNotice}
+        </div>
+      )}
     </div>
   );
 }

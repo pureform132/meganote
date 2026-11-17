@@ -59,6 +59,8 @@ Notion es extraordinario, pero para muchas personas es demasiado: cuenta obligat
 ## Funciones
 
 - **Editor de bloques** — texto, H1–H3, listas, to-dos, toggles, citas, código, destacados, divisores, imágenes y adjuntos de cualquier tipo.
+- **Escribe haciendo clic en el papel** — el espacio libre bajo el contenido crea un bloque y coloca el cursor, como en Notion.
+- **Arrastra páginas para anidarlas** — desde el árbol lateral, una tarjeta de subpágina, un enlace o una miga; suéltala sobre una página, una fila, una tarjeta o una base de datos.
 - **Subpáginas** — crea una página dentro de otra desde el encabezado o con `/subpágina`; la tarjeta muestra su icono, título y número de hijas.
 - **Stickers y portadas** — 43 iconos propios con buscador y seis portadas planas de la paleta.
 - **Tabla de contenido** — `/toc` genera un índice navegable desde los encabezados H1–H3.
