@@ -64,7 +64,7 @@ Notion es extraordinario, pero para muchas personas es demasiado: cuenta obligat
 - **Tabla de contenido** — `/toc` genera un índice navegable desde los encabezados H1–H3.
 - **Duplicar y mover** — copia una página con todo su subárbol o muévela con un buscador de destinos.
 - **Enlaces y backlinks** — menciona páginas con `/enlace` y descubre quién te menciona en «Mencionada en».
-- **Menú `/`** — 18 tipos de bloque, navegable con teclado.
+- **Menú `/`** — 17 tipos de bloque, navegable con teclado.
 - **Formato inline** — `Ctrl+B` negrita, `Ctrl+I` itálica, `Ctrl+Shift+X` tachado, `Ctrl+\`` código.
 - **Atajos Markdown** — `#`, `##`, `###`, `-`, `1.`, `[]`, `>`, ` ``` ` al inicio de un bloque.
 - **Páginas dentro de páginas** — árbol sin límite, favoritos y papelera reversible.
