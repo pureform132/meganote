@@ -4,6 +4,8 @@
 
 **Sin cuenta. Sin nube. Sin telemetría.** Todo se guarda en tu máquina.
 
+**[Web](https://pureform132.github.io/takenotes/) · [Descargar para Windows](https://github.com/pureform132/takenotes/releases/latest) · [Demo en el navegador](https://pureform132.github.io/takenotes/app.html) · [Capturas](docs/screenshots/)**
+
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-C65D3B?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/pureform132/takenotes?style=flat-square&color=9AA88A)](https://github.com/pureform132/takenotes/releases/latest)
 [![Plataforma](https://img.shields.io/badge/Windows%20%7C%20Web-2E2A26?style=flat-square)](#descargar)
