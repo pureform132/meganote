@@ -1,0 +1,32 @@
+name: Idea
+description: Propón una función o una mejora
+title: "[Idea] "
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: ¿Qué problema resuelve?
+      description: Empieza por la necesidad, no por la solución.
+    validations:
+      required: true
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+      description: Cómo imaginas la función en Takenotes.
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+      description: Otras apps, atajos o formas de resolverlo.
+  - type: checkboxes
+    id: alcance
+    attributes:
+      label: Encaje con el proyecto
+      options:
+        - label: Funciona sin cuenta y sin conexión
+          required: true
+        - label: Respeta la paleta de cuatro colores
+          required: true

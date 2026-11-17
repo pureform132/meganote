@@ -1,0 +1,16 @@
+node_modules
+dist
+.impeccable/mocks
+.impeccable/review
+.impeccable/build
+.impeccable/live
+.impeccable/questions
+.impeccable/config.local.json
+*.local
+release-py
+release
+release-stage
+src-tauri
+.venv-release
+tsconfig.app.tsbuildinfo
+

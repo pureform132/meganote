@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Takenotes — tarjeta social</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #FDFCF8; color: #2E2A26;
+    font-family: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
+    position: relative;
+  }
+  .frame {
+    position: absolute; inset: 24px; border: 1px solid rgba(46, 42, 38, .22);
+    border-radius: 14px; overflow: hidden;
+  }
+  .wash {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(900px 420px at 82% 12%, rgba(154, 168, 138, .20), transparent 62%),
+      radial-gradient(720px 420px at 8% 96%, rgba(198, 93, 59, .10), transparent 60%);
+  }
+  .grid {
+    position: absolute; inset: 0;
+    display: grid; grid-template-columns: 476px 1fr; align-items: center;
+    padding: 58px 54px 54px 58px; gap: 34px;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(46, 42, 38, .66); margin-bottom: 22px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #C65D3B; }
+  h1 {
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    font-weight: 500; font-size: 76px; line-height: .94; letter-spacing: -.028em;
+    margin-bottom: 18px;
+  }
+  h1 em { font-style: italic; color: #C65D3B; }
+  .sub {
+    font-size: 21px; line-height: 1.42; color: rgba(46, 42, 38, .74);
+    max-width: 390px; margin-bottom: 30px;
+  }
+  .sub b { font-weight: 600; color: #2E2A26; }
+  .meta { display: flex; align-items: center; gap: 14px; font-size: 13.5px; color: rgba(46, 42, 38, .62); }
+  .swatches { display: flex; gap: 5px; }
+  .swatches i { width: 13px; height: 13px; border-radius: 50%; display: block; }
+  .rule { width: 1px; height: 14px; background: rgba(46, 42, 38, .2); }
+
+  .shotwrap {
+    position: relative; height: 474px; border-radius: 12px;
+    background: #fff; border: 1px solid rgba(46, 42, 38, .18);
+    box-shadow: 0 2px 3px rgba(46, 42, 38, .06), 0 26px 48px -22px rgba(46, 42, 38, .38);
+    overflow: hidden;
+  }
+  .bar { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border-bottom: 1px solid rgba(46,42,38,.12); background: #F7F4EC; }
+  .bar i { width: 7px; height: 7px; border-radius: 50%; background: rgba(46,42,38,.18); }
+  .bar span { margin-left: 8px; font-size: 10px; color: rgba(46,42,38,.45); letter-spacing: .04em; }
+  .shotwrap img { display: block; width: 1600px; height: 1000px; transform: scale(.47); transform-origin: top left; }
+  .stamp {
+    position: absolute; right: 16px; bottom: 14px;
+    font-family: "Newsreader", Georgia, serif; font-size: 15px; font-style: italic;
+    color: rgba(46, 42, 38, .5); background: #FDFCF8; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid rgba(46,42,38,.12);
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="wash"></div>
+    <div class="grid">
+      <div>
+        <p class="eyebrow"><span class="dot"></span> Open source · local-first</p>
+        <h1>Tus notas,<br /><em>en papel.</em></h1>
+        <p class="sub">La calma de un cuaderno con las funciones de <b>Notion</b>. Sin cuenta, sin nube, sin telemetría.</p>
+        <div class="meta">
+          <span class="swatches">
+            <i style="background:#2E2A26"></i>
+            <i style="background:#FDFCF8;box-shadow:inset 0 0 0 1px rgba(46,42,38,.25)"></i>
+            <i style="background:#C65D3B"></i>
+            <i style="background:#9AA88A"></i>
+          </span>
+          <span class="rule"></span>
+          <span>Takenotes · 13 MB · MIT</span>
+        </div>
+      </div>
+      <div class="shotwrap">
+        <div class="bar"><i></i><i></i><i></i><span>takenotes — local</span></div>
+        <img src="screenshots/light-editor.png" alt="Interfaz de Takenotes: editor de bloques en español" />
+        <span class="stamp">local-first</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

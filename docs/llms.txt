@@ -1,0 +1,18 @@
+# Takenotes
+
+> Takenotes es una app de notas open source, local-first y en español, con las funciones esenciales de Notion: editor de bloques, páginas anidadas, bases de datos (tabla, kanban, calendario, gráfico), búsqueda a texto completo e importación del export Markdown y CSV de Notion. Sin cuenta, sin nube y sin telemetría. Licencia MIT.
+
+## Enlaces
+
+- Web: https://pureform132.github.io/takenotes/
+- Código: https://github.com/pureform132/takenotes
+- Descarga: https://github.com/pureform132/takenotes/releases/latest
+- Demo en el navegador: https://pureform132.github.io/takenotes/app.html
+- Licencia: https://github.com/pureform132/takenotes/blob/main/LICENSE
+
+## Datos
+
+- Plataforma: Windows 10/11 (13 MB, WebView2) y web.
+- Stack: React 19, Vite 7, TypeScript, IndexedDB.
+- Almacenamiento: local (`%APPDATA%\Takenotes` en escritorio); backups JSON y Markdown.
+- Precio: gratis (MIT).

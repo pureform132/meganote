@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pureform132.github.io/takenotes/sitemap.xml

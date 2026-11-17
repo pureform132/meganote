@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Takenotes — alternativa a Notion open source, local-first y en español</title>
+  <meta name="description" content="App de notas open source con las funciones de Notion: editor de bloques, páginas anidadas, bases de datos y búsqueda. Sin cuenta, sin nube y en español. Gratis (MIT)." />
+  <meta name="keywords" content="alternativa a Notion, app de notas open source, notas local-first, Notion en español, app de notas sin nube, block editor, base de datos kanban, importar Notion, Takenotes" />
+  <meta name="author" content="Takenotes contributors" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="theme-color" content="#FDFCF8" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="canonical" href="https://pureform132.github.io/takenotes/" />
+  <link rel="alternate" hreflang="es" href="https://pureform132.github.io/takenotes/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Takenotes" />
+  <meta property="og:locale" content="es_ES" />
+  <meta property="og:title" content="Takenotes — tus notas, en papel" />
+  <meta property="og:description" content="Editor de bloques, bases de datos, búsqueda e importación desde Notion. Open source, local-first y en español. Sin cuenta ni nube." />
+  <meta property="og:url" content="https://pureform132.github.io/takenotes/" />
+  <meta property="og:image" content="https://pureform132.github.io/takenotes/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Takenotes: tus notas, en papel. App de notas open source con las funciones de Notion." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Takenotes — tus notas, en papel" />
+  <meta name="twitter:description" content="Alternativa a Notion open source, local-first y en español. Sin cuenta, sin nube, 13 MB." />
+  <meta name="twitter:image" content="https://pureform132.github.io/takenotes/og-image.png" />
+
+  <link rel="preload" href="fonts/newsreader-500.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/hanken-400.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="screenshots/light-editor.png" as="image" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://pureform132.github.io/takenotes/#website",
+        "url": "https://pureform132.github.io/takenotes/",
+        "name": "Takenotes",
+        "description": "App de notas open source, local-first y en español con las funciones de Notion.",
+        "inLanguage": "es"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://pureform132.github.io/takenotes/#app",
+        "name": "Takenotes",
+        "applicationCategory": "ProductivityApplication",
+        "applicationSubCategory": "Note-taking",
+        "operatingSystem": "Windows, Web",
+        "softwareVersion": "1.0.0",
+        "url": "https://pureform132.github.io/takenotes/",
+        "downloadUrl": "https://github.com/pureform132/takenotes/releases/latest",
+        "codeRepository": "https://github.com/pureform132/takenotes",
+        "license": "https://opensource.org/licenses/MIT",
+        "inLanguage": "es",
+        "description": "App de notas open source con editor de bloques, páginas anidadas, bases de datos (tabla, kanban, calendario, gráfico), búsqueda a texto completo e importación desde Notion. Sin cuenta, sin nube y en español.",
+        "screenshot": "https://pureform132.github.io/takenotes/screenshots/light-editor.png",
+        "featureList": [
+          "Editor de bloques con comandos /",
+          "Páginas anidadas y búsqueda a texto completo",
+          "Bases de datos con vistas de tabla, kanban, calendario y gráfico",
+          "Importación del export Markdown y CSV de Notion",
+          "Modo oscuro y modo claro",
+          "Varios workspaces",
+          "Funciona sin conexión y sin cuenta"
+        ],
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+        "author": { "@type": "Organization", "name": "Takenotes contributors" }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://pureform132.github.io/takenotes/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "¿Takenotes es gratis?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sí. Takenotes es open source con licencia MIT: no hay cuenta, plan de pago ni límite de páginas. Puedes usarlo, modificarlo y redistribuirlo." }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Dónde se guardan mis notas?",
+            "acceptedAnswer": { "@type": "Answer", "text": "En IndexedDB dentro de la app. En el ejecutable de Windows se guardan en %APPDATA%\\Takenotes. Los datos no salen de tu máquina y puedes exportarlos en JSON o Markdown." }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Puedo importar mi workspace de Notion?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sí. En Notion exporta con Configuración → Exportar → Markdown y CSV, descarga el .zip y en Takenotes usa el botón de importar. Se reconstruyen páginas, jerarquía, bases de datos e imágenes." }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Funciona sin internet?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sí, la app es 100 % local y no hace peticiones de red en tiempo de ejecución. Solo necesitas internet para descargarla." }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Es un clon de Notion?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. Takenotes replica las funciones principales con una interfaz y un código propios. No incluye colaboración en tiempo real, IA ni publicaciones web." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    @font-face {
+      font-family: "Newsreader"; font-style: normal; font-weight: 400; font-display: swap;
+      src: url("fonts/newsreader-400.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Newsreader"; font-style: normal; font-weight: 500; font-display: swap;
+      src: url("fonts/newsreader-500.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Newsreader"; font-style: italic; font-weight: 400; font-display: swap;
+      src: url("fonts/newsreader-400-italic.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Hanken Grotesk"; font-style: normal; font-weight: 400; font-display: swap;
+      src: url("fonts/hanken-400.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Hanken Grotesk"; font-style: normal; font-weight: 600; font-display: swap;
+      src: url("fonts/hanken-600.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Hanken Grotesk"; font-style: normal; font-weight: 700; font-display: swap;
+      src: url("fonts/hanken-700.woff2") format("woff2");
+    }
+
+    :root {
+      --paper: #FDFCF8;
+      --ink: #2E2A26;
+      --terra: #C65D3B;
+      --sage: #9AA88A;
+      --ink-70: color-mix(in oklab, var(--ink) 70%, var(--paper));
+      --ink-62: color-mix(in oklab, var(--ink) 62%, var(--paper));
+      --ink-48: color-mix(in oklab, var(--ink) 48%, var(--paper));
+      --line: color-mix(in oklab, var(--ink) 15%, var(--paper));
+      --line-soft: color-mix(in oklab, var(--ink) 8%, var(--paper));
+      --terra-soft: color-mix(in oklab, var(--terra) 11%, var(--paper));
+      --sage-soft: color-mix(in oklab, var(--sage) 17%, var(--paper));
+      --paper-2: color-mix(in oklab, var(--paper) 94%, var(--ink));
+      --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+      --font-body: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
+      --font-mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+      --shadow: 0 1px 2px rgba(46, 42, 38, .05), 0 18px 40px -24px rgba(46, 42, 38, .32);
+      --ease: cubic-bezier(.19, 1, .22, 1);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--paper); color: var(--ink);
+      font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    }
+    ::selection { background: var(--terra-soft); }
+    a { color: inherit; }
+    img { max-width: 100%; height: auto; display: block; }
+    :focus-visible { outline: 2px solid var(--terra); outline-offset: 3px; border-radius: 2px; }
+
+    .skip {
+      position: absolute; left: 16px; top: -60px; z-index: 100;
+      background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; text-decoration: none; transition: top .2s var(--ease);
+    }
+    .skip:focus { top: 12px; }
+
+    .wrap { width: min(1120px, calc(100% - 48px)); margin: 0 auto; }
+
+    /* ---------- nav ---------- */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: color-mix(in oklab, var(--paper) 92%, transparent);
+      backdrop-filter: blur(12px); border-bottom: 1px solid var(--line-soft);
+    }
+    .nav__in { display: flex; align-items: center; gap: 22px; height: 68px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; margin-right: auto; }
+    .brand svg { width: 28px; height: 28px; }
+    .brand b { font-family: var(--font-display); font-size: 24px; font-weight: 500; letter-spacing: -.02em; }
+    .nav a.navlink {
+      font-size: 14px; font-weight: 600; color: var(--ink-70); text-decoration: none;
+      padding: 6px 2px; border-bottom: 1px solid transparent; transition: color .18s, border-color .18s;
+    }
+    .nav a.navlink:hover { color: var(--ink); border-color: var(--terra); }
+    .nav .ghostbtn { margin-left: 6px; }
+    @media (max-width: 820px) {
+      .nav a.navlink { display: none; }
+    }
+
+    /* ---------- buttons ---------- */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      border-radius: 999px; padding: 12px 22px; font-family: var(--font-body);
+      font-size: 14.5px; font-weight: 600; text-decoration: none; cursor: pointer;
+      border: 1px solid transparent; transition: transform .18s var(--ease), background .18s, box-shadow .18s, border-color .18s;
+      white-space: nowrap;
+    }
+    .btn--primary {
+      background: color-mix(in oklab, var(--terra) 80%, var(--ink)); color: var(--paper);
+      box-shadow: 0 2px 0 color-mix(in oklab, var(--terra) 46%, var(--ink)), 0 10px 22px -12px color-mix(in oklab, var(--terra) 55%, transparent);
+    }
+    .btn--primary:hover { transform: translateY(-1px); background: color-mix(in oklab, var(--terra) 70%, var(--ink)); }
+    .btn--primary:active { transform: translateY(1px); box-shadow: 0 1px 0 color-mix(in oklab, var(--terra) 46%, var(--ink)); }
+    .btn--ghost { border-color: var(--line); color: var(--ink-70); background: transparent; }
+    .btn--ghost:hover { border-color: var(--ink-48); color: var(--ink); background: var(--paper-2); }
+    .btn--small { padding: 8px 16px; font-size: 13px; }
+    .ghostbtn { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink-70); border-radius: 999px; padding: 8px 15px; font-size: 13.5px; font-weight: 600; text-decoration: none; transition: .18s var(--ease); }
+    .ghostbtn:hover { color: var(--ink); border-color: var(--ink-48); background: var(--paper-2); }
+
+    /* ---------- hero ---------- */
+    .hero { padding: 76px 0 0; position: relative; overflow: hidden; }
+    .hero::before {
+      content: ""; position: absolute; inset: 0 0 auto; height: 560px; pointer-events: none;
+      background:
+        radial-gradient(760px 380px at 82% 8%, color-mix(in oklab, var(--sage) 20%, transparent), transparent 64%),
+        radial-gradient(620px 360px at 6% 38%, color-mix(in oklab, var(--terra) 9%, transparent), transparent 62%);
+    }
+    .hero__grid { position: relative; display: grid; grid-template-columns: .9fr 1.1fr; gap: 46px; align-items: center; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 9px; margin: 0 0 22px;
+      font-size: 11.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-62);
+    }
+    .eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--terra); }
+    h1 {
+      font-family: var(--font-display); font-weight: 500; font-size: clamp(54px, 7.2vw, 88px);
+      line-height: .95; letter-spacing: -.032em; margin: 0 0 22px;
+    }
+    h1 em { font-style: italic; color: var(--terra); }
+    .lede { font-size: 19px; line-height: 1.5; color: var(--ink-70); max-width: 480px; margin: 0 0 30px; }
+    .lede b { color: var(--ink); font-weight: 600; }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .fine { margin: 18px 0 0; font-size: 12.5px; color: var(--ink-48); }
+    .fine span { margin: 0 4px; }
+
+    .hero__shot { position: relative; }
+    .floatcard {
+      position: absolute; z-index: 3; left: -26px; bottom: 34px;
+      background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: var(--shadow); padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+      font-size: 12px; color: var(--ink-62); animation: rise .8s var(--ease) .5s both;
+    }
+    .floatcard b { display: block; font-size: 12.5px; color: var(--ink); font-weight: 600; }
+    .floatcard .tick { width: 26px; height: 26px; border-radius: 50%; background: var(--sage-soft); color: var(--sage); display: grid; place-items: center; }
+    .floatcard .tick svg { width: 14px; height: 14px; }
+
+    .shotframe {
+      position: relative; background: var(--paper); border: 1px solid var(--line);
+      border-radius: 14px; overflow: hidden; box-shadow: var(--shadow);
+      animation: rise .9s var(--ease) .15s both;
+    }
+    .shotframe__bar {
+      height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 13px;
+      border-bottom: 1px solid var(--line-soft); background: var(--paper-2);
+    }
+    .shotframe__bar i { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in oklab, var(--ink) 20%, var(--paper)); }
+    .shotframe__bar span { margin-left: 8px; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-48); }
+    .shotframe img { width: 100%; aspect-ratio: 1336 / 760; object-fit: cover; object-position: left top; }
+
+    @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+    /* ---------- sections ---------- */
+    section { padding: 92px 0; }
+    .kicker {
+      display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px;
+      font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--sage);
+    }
+    .kicker::before { content: ""; width: 22px; height: 1px; background: var(--sage); display: inline-block; }
+    h2 {
+      font-family: var(--font-display); font-weight: 500; font-size: clamp(34px, 4.4vw, 50px);
+      line-height: 1.05; letter-spacing: -.025em; margin: 0 0 16px;
+    }
+    h2 em { font-style: italic; color: var(--terra); }
+    .section__lede { font-size: 17.5px; color: var(--ink-62); max-width: 620px; margin: 0 0 46px; }
+
+    /* features */
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 44px; }
+    .feature { padding: 26px 0 28px; border-top: 1px solid var(--line); }
+    .feature__num { font-family: var(--font-mono); font-size: 11px; color: var(--sage); letter-spacing: .08em; }
+    .feature h3 { font-family: var(--font-display); font-size: 25px; font-weight: 500; margin: 12px 0 8px; letter-spacing: -.015em; }
+    .feature p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--ink-62); }
+    .feature__ic { width: 30px; height: 30px; color: var(--terra); margin-bottom: 2px; }
+    .feature__ic svg { width: 100%; height: 100%; }
+
+    /* gallery */
+    .gallery { display: grid; grid-template-columns: 1fr; gap: 44px; max-width: 1020px; }
+    .gallery figure { margin: 0; }
+    .gallery .frame {
+      border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--paper);
+      box-shadow: 0 14px 30px -24px rgba(46, 42, 38, .4); transition: transform .3s var(--ease), box-shadow .3s;
+    }
+    .gallery figure:hover .frame { transform: translateY(-3px); box-shadow: 0 22px 40px -26px rgba(46, 42, 38, .45); }
+    .gallery img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: left top; }
+    .gallery figcaption { font-size: 13px; color: var(--ink-48); margin-top: 10px; }
+    .gallery figcaption b { color: var(--ink-70); font-weight: 600; }
+
+    /* dark band */
+    .band { background: color-mix(in oklab, var(--ink) 96%, var(--terra)); color: var(--paper); padding: 92px 0; }
+    .band .kicker { color: var(--sage); }
+    .band h2 { color: var(--paper); }
+    .band h2 em { color: color-mix(in oklab, var(--terra) 78%, var(--paper)); }
+    .band__grid { display: grid; grid-template-columns: .92fr 1.08fr; gap: 56px; align-items: center; }
+    .band p { color: color-mix(in oklab, var(--paper) 74%, var(--ink)); }
+    .band .shotframe { border-color: color-mix(in oklab, var(--paper) 18%, transparent); box-shadow: 0 30px 60px -30px rgba(0,0,0,.55); }
+    .band .shotframe__bar { background: color-mix(in oklab, var(--ink) 88%, var(--paper)); border-color: color-mix(in oklab, var(--paper) 12%, transparent); }
+    .band .shotframe__bar span { color: color-mix(in oklab, var(--paper) 45%, var(--ink)); }
+    .band .shotframe__bar i { background: color-mix(in oklab, var(--paper) 22%, var(--ink)); }
+    .datalist { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 16px; }
+    .datalist li { display: grid; grid-template-columns: 22px 1fr; gap: 12px; font-size: 14.5px; line-height: 1.5; }
+    .datalist svg { width: 18px; height: 18px; margin-top: 2px; color: var(--sage); }
+    .datalist b { color: var(--paper); font-weight: 600; }
+
+    /* notion steps */
+    .notion__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+    .steps { list-style: none; counter-reset: step; margin: 0; padding: 0; display: grid; gap: 22px; }
+    .steps li { counter-increment: step; display: grid; grid-template-columns: 38px 1fr; gap: 16px; }
+    .steps li::before {
+      content: counter(step); font-family: var(--font-display); font-size: 20px;
+      width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+      display: grid; place-items: center; color: var(--terra); background: var(--paper);
+    }
+    .steps h3 { font-size: 16.5px; font-weight: 600; margin: 2px 0 4px; }
+    .steps p { margin: 0; font-size: 14px; color: var(--ink-62); line-height: 1.5; }
+    .kbd { font-family: var(--font-mono); font-size: 11.5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; background: var(--paper-2); }
+    .notion__shot .frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); background: var(--paper); }
+    .notion__shot img { width: 100%; }
+    .shotnote { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-48); }
+
+    /* download */
+    .download { background: var(--paper-2); border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+    .dlgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 8px; }
+    .dlcard {
+      background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 26px 24px;
+      display: flex; flex-direction: column; gap: 10px; transition: border-color .2s, transform .2s var(--ease);
+    }
+    .dlcard:hover { border-color: var(--ink-48); transform: translateY(-2px); }
+    .dlcard--star { border-color: color-mix(in oklab, var(--terra) 45%, var(--paper)); box-shadow: 0 18px 40px -30px color-mix(in oklab, var(--terra) 60%, transparent); }
+    .dlcard__tag { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-48); }
+    .dlcard--star .dlcard__tag { color: var(--terra); }
+    .dlcard h3 { font-family: var(--font-display); font-size: 26px; font-weight: 500; margin: 0; }
+    .dlcard p { font-size: 13.5px; color: var(--ink-62); line-height: 1.5; margin: 0 0 6px; }
+    .dlcard .fine { margin-top: auto; }
+    .dlcard .btn { width: 100%; }
+    .code {
+      margin-top: 20px; background: var(--ink); color: color-mix(in oklab, var(--paper) 82%, var(--sage));
+      border-radius: 12px; padding: 16px 18px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7;
+      overflow-x: auto;
+    }
+    .code span { color: color-mix(in oklab, var(--paper) 48%, var(--ink)); }
+
+    /* faq */
+    .faq { display: grid; grid-template-columns: .8fr 1.2fr; gap: 60px; align-items: start; }
+    .faq__list { display: grid; }
+    details { border-top: 1px solid var(--line); padding: 20px 0; }
+    details:last-child { border-bottom: 1px solid var(--line); }
+    summary {
+      cursor: pointer; list-style: none; display: flex; gap: 16px; align-items: baseline;
+      font-size: 16.5px; font-weight: 600; color: var(--ink);
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; margin-left: auto; font-family: var(--font-display); font-size: 22px; color: var(--terra); line-height: 1; }
+    details[open] summary::after { content: "–"; }
+    details p { margin: 10px 0 0 0; font-size: 14.5px; color: var(--ink-62); max-width: 560px; }
+
+    /* footer */
+    footer { padding: 44px 0 54px; border-top: 1px solid var(--line-soft); }
+    .foot { display: flex; flex-wrap: wrap; gap: 18px 30px; align-items: center; font-size: 13px; color: var(--ink-48); }
+    .foot .brand b { font-size: 20px; color: var(--ink); }
+    .foot nav { display: flex; gap: 20px; margin-left: auto; }
+    .foot a { text-decoration: none; color: var(--ink-62); }
+    .foot a:hover { color: var(--terra); }
+
+    @media (max-width: 980px) {
+      .hero__grid, .band__grid, .notion__grid, .faq { grid-template-columns: 1fr; gap: 40px; }
+      .hero { padding-top: 52px; }
+      .features { grid-template-columns: 1fr 1fr; }
+      .gallery { grid-template-columns: 1fr; }
+      .dlgrid { grid-template-columns: 1fr; }
+      .floatcard { display: none; }
+      section { padding: 68px 0; }
+    }
+    @media (max-width: 600px) {
+      .wrap { width: calc(100% - 32px); }
+      .features { grid-template-columns: 1fr; }
+      .hero__grid { gap: 32px; }
+      .lede { font-size: 17px; }
+      .cta .btn { width: 100%; }
+      .foot nav { margin-left: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .001s !important; transition-duration: .001s !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#contenido">Saltar al contenido</a>
+
+  <header class="nav">
+    <div class="wrap nav__in">
+      <a class="brand" href="#" aria-label="Takenotes, inicio">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="#FDFCF8" stroke="rgba(46,42,38,.14)"/>
+          <path d="M9 22.5c2.6-.4 3.5-7.7 4.6-11.4.9-3 2.4-2.6 3.3.3.5 1.6 1 3.9 1.4 5.7" stroke="#2E2A26" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M20.5 9.5h3.2M20.5 14h3.2M20.5 18.5h3.2" stroke="#C65D3B" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <b>Takenotes</b>
+      </a>
+      <a class="navlink" href="#funciones">Funciones</a>
+      <a class="navlink" href="#capturas">Capturas</a>
+      <a class="navlink" href="#notion">Importar de Notion</a>
+      <a class="navlink" href="#descargar">Descargar</a>
+      <a class="ghostbtn" href="https://github.com/pureform132/takenotes" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.4 4.3 18.4 4.6 18.4 4.6c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </header>
+
+  <main id="contenido">
+    <section class="hero">
+      <div class="wrap hero__grid">
+        <div>
+          <p class="eyebrow"><i></i> Open source · local-first · en español</p>
+          <h1>Tus notas,<br /><em>en papel.</em></h1>
+          <p class="lede">La calma de un cuaderno con las funciones de <b>Notion</b>: bloques, páginas anidadas, bases de datos y búsqueda. <b>Sin cuenta, sin nube, sin telemetría.</b></p>
+          <div class="cta">
+            <a class="btn btn--primary" href="https://github.com/pureform132/takenotes/releases/latest" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg>
+              Descargar para Windows
+            </a>
+            <a class="btn btn--ghost" href="app.html">Probar en el navegador</a>
+          </div>
+          <p class="fine">Gratis y libre (MIT)<span>·</span>13 MB<span>·</span>Windows 10/11 y cualquier navegador moderno</p>
+        </div>
+        <div class="hero__shot">
+          <figure class="shotframe" aria-label="Captura de la interfaz de Takenotes">
+            <div class="shotframe__bar"><i></i><i></i><i></i><span>takenotes — local</span></div>
+            <img src="screenshots/hero-detail.png" width="1336" height="760" alt="Editor de bloques de Takenotes con páginas anidadas, callouts y búsqueda en la barra lateral" />
+          </figure>
+          <div class="floatcard">
+            <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"/></svg></span>
+            <span><b>Guardado · 18:24</b>en tu máquina, no en la nube</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="funciones">
+      <div class="wrap">
+        <p class="kicker">Lo que sí usas</p>
+        <h2>Menos producto, <em>más cuaderno.</em></h2>
+        <p class="section__lede">Takenotes no intenta ser todas las herramientas. Replica las funciones que sostienen un sistema de notas personal y las pule hasta que desaparecen.</p>
+
+        <div class="features">
+          <article class="feature">
+            <div class="feature__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 6h16M4 11h11M4 16h13"/><path d="M4 21h7"/></svg></div>
+            <p class="feature__num">01</p>
+            <h3>Editor de bloques</h3>
+            <p>Encabezados, listas, to-dos, toggles, citas, código, destacados, imágenes y adjuntos. Escribe <span class="kbd">/</span> y aparece el menú.</p>
+          </article>
+          <article class="feature">
+            <div class="feature__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg></div>
+            <p class="feature__num">02</p>
+            <h3>Bases de datos</h3>
+            <p>Tabla, kanban, calendario y gráfico sobre los mismos datos. Ordena, filtra y agrupa sin construir fórmulas.</p>
+          </article>
+          <article class="feature">
+            <div class="feature__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg></div>
+            <p class="feature__num">03</p>
+            <h3>Búsqueda total</h3>
+            <p><span class="kbd">Ctrl</span> + <span class="kbd">K</span> encuentra títulos, párrafos y filas de bases de datos al instante. Sin indexar en la nube.</p>
+          </article>
+          <article class="feature">
+            <div class="feature__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4"/><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg></div>
+            <p class="feature__num">04</p>
+            <h3>Importar de Notion</h3>
+            <p>Sube el <b>.zip</b> del export Markdown y CSV. Páginas, jerarquía, bases de datos e imágenes, reconstruidas en local.</p>
+          </article>
+          <article class="feature">
+            <div class="feature__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 5h16v14H4z"/><path d="M4 10h16M10 10v9"/></svg></div>
+            <p class="feature__num">05</p>
+            <h3>Varios workspaces</h3>
+            <p>Personal y Trabajo, cada uno con su árbol, sus bases de datos y su papelera. Cambia con un clic.</p>
+          </article>
+          <article class="feature">
+            <div class="feature__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg></div>
+            <p class="feature__num">06</p>
+            <h3>Modo oscuro</h3>
+            <p>«The Night Desk»: el mismo cuaderno de noche, con papel ember cálido. Sigue a tu sistema o se cambia a mano.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="capturas">
+      <div class="wrap">
+        <p class="kicker">Por dentro</p>
+        <h2>La interfaz, <em>sin maquillaje.</em></h2>
+        <p class="section__lede">Capturas reales de la app, no renders. Cuatro matices, tipografía editorial y ninguna caja innecesaria.</p>
+        <div class="gallery">
+          <figure>
+            <div class="frame"><img src="screenshots/db-table.png" width="1600" height="1000" loading="lazy" alt="Base de datos en vista de tabla con propiedades de estado, prioridad y fecha" /></div>
+            <figcaption><b>Tabla.</b> Ordena, filtra y edita cada celda en línea.</figcaption>
+          </figure>
+          <figure>
+            <div class="frame"><img src="screenshots/db-board.png" width="1600" height="1000" loading="lazy" alt="Tablero kanban agrupado por estado con tarjetas arrastrables" /></div>
+            <figcaption><b>Kanban.</b> Arrastra tarjetas entre columnas agrupadas por cualquier selección.</figcaption>
+          </figure>
+          <figure>
+            <div class="frame"><img src="screenshots/db-chart.png" width="1600" height="1000" loading="lazy" alt="Gráfico de barras por estado generado desde la base de datos" /></div>
+            <figcaption><b>Gráfico.</b> Barras calculadas al vuelo por estado o por mes.</figcaption>
+          </figure>
+          <figure>
+            <div class="frame"><img src="screenshots/light-search_wait.png" width="1600" height="1000" loading="lazy" alt="Paleta de búsqueda de Takenotes con resultados resaltados" /></div>
+            <figcaption><b>Búsqueda.</b> Ctrl + K recorre títulos, bloques y filas.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap band__grid">
+        <div>
+          <p class="kicker">Privacidad por diseño</p>
+          <h2>Tus datos <em>no viajan.</em></h2>
+          <p>No hay servidor, ni cuenta, ni analítica. Takenotes es una aplicación local que casualmente sabe escribir en Markdown y dibujar tablas.</p>
+          <ul class="datalist">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"/></svg>
+              <span><b>Auto-guardado local.</b> IndexedDB en la app; <span class="kbd">%APPDATA%\\Takenotes</span> en Windows.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"/></svg>
+              <span><b>Backups que puedes leer.</b> JSON completo y Markdown por página, sin formatos propietarios.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"/></svg>
+              <span><b>Cero red.</b> Fuentes, iconos y lógica van dentro del build. Nada que bloquear con un cortafuegos.</span>
+            </li>
+          </ul>
+        </div>
+        <div class="hero__shot">
+          <figure class="shotframe" aria-label="Captura del modo oscuro de Takenotes">
+            <div class="shotframe__bar"><i></i><i></i><i></i><span>takenotes — the night desk</span></div>
+            <img src="screenshots/dark_editor.png" width="1600" height="1000" loading="lazy" alt="Takenotes en modo oscuro con papel ember, tinta luminosa y acentos terracota" />
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="notion">
+      <div class="wrap notion__grid">
+        <div>
+          <p class="kicker">Migrar sin fricción</p>
+          <h2>Trae tu <em>workspace.</em></h2>
+          <p class="section__lede">El importador usa el formato de intercambio oficial de Notion. No es una captura de pantalla: reconstruye la estructura.</p>
+          <ol class="steps">
+            <li>
+              <div>
+                <h3>Exporta desde Notion</h3>
+                <p>Configuración → Exportar → <b>Markdown y CSV</b>, con subpáginas incluidas. Descarga el <span class="kbd">.zip</span>.</p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Abre el importador</h3>
+                <p>En Takenotes, icono de importar en el pie de la barra lateral → <b>Elegir .zip…</b>.</p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Sigue escribiendo</h3>
+                <p>Páginas, jerarquía, bases de datos (con tipos inferidos) e imágenes aparecen en tu cuaderno local.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+        <div class="notion__shot">
+          <figure class="frame" aria-label="Panel de importación de Notion en Takenotes">
+            <img src="screenshots/import-detail.png" width="845" height="403" loading="eager" alt="Detalle del importador de Takenotes con los pasos para importar un export Markdown y CSV de Notion" />
+          </figure>
+          <p class="shotnote">El importador, tal como aparece en el pie de la barra lateral.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="descargar" class="download">
+      <div class="wrap">
+        <p class="kicker">Empieza en un minuto</p>
+        <h2>Descarga <em>Takenotes.</em></h2>
+        <p class="section__lede">Un ejecutable de 13 MB, una demo en el navegador o el código completo. Los tres son la misma app.</p>
+        <div class="dlgrid">
+          <article class="dlcard dlcard--star">
+            <span class="dlcard__tag">Recomendado</span>
+            <h3>Windows</h3>
+            <p>Un solo <b>Takenotes.exe</b> sobre WebView2. Sin instalador, sin servicios en segundo plano.</p>
+            <a class="btn btn--primary" href="https://github.com/pureform132/takenotes/releases/latest" rel="noopener">Descargar el .exe</a>
+            <p class="fine">~13 MB · Windows 10/11 · SmartScreen puede pedir confirmación</p>
+          </article>
+          <article class="dlcard">
+            <span class="dlcard__tag">Sin instalar</span>
+            <h3>Navegador</h3>
+            <p>La demo es un único archivo HTML autocontenido. Los datos quedan en el IndexedDB de tu navegador.</p>
+            <a class="btn btn--ghost" href="app.html">Abrir la demo</a>
+            <p class="fine">Funciona offline una vez cargada</p>
+          </article>
+          <article class="dlcard">
+            <span class="dlcard__tag">Open source</span>
+            <h3>Código</h3>
+            <p>React 19, TypeScript e IndexedDB. Licencia MIT: léelo, cámbialo, redistribúyelo.</p>
+            <a class="btn btn--ghost" href="https://github.com/pureform132/takenotes" rel="noopener">Ver en GitHub</a>
+            <p class="fine">Issues y PRs bienvenidos</p>
+          </article>
+        </div>
+        <div class="code" aria-label="Comandos para ejecutar desde el código">
+          <span># clonar y ejecutar</span><br />
+          git clone https://github.com/pureform132/takenotes.git<br />
+          cd takenotes &amp;&amp; npm install &amp;&amp; npm run dev
+        </div>
+      </div>
+    </section>
+
+    <section id="faq">
+      <div class="wrap faq">
+        <div>
+          <p class="kicker">Dudas razonables</p>
+          <h2>Preguntas <em>frecuentes.</em></h2>
+          <p class="section__lede">Si falta algo, abre un issue en GitHub y lo respondemos en público.</p>
+          <a class="btn btn--ghost btn--small" href="https://github.com/pureform132/takenotes/issues" rel="noopener">Abrir un issue</a>
+        </div>
+        <div class="faq__list">
+          <details>
+            <summary>¿Takenotes es gratis?</summary>
+            <p>Sí. Es open source con licencia MIT: sin cuenta, sin plan de pago y sin límite de páginas. Puedes usarlo, modificarlo y redistribuirlo.</p>
+          </details>
+          <details>
+            <summary>¿Dónde se guardan mis notas?</summary>
+            <p>En IndexedDB dentro de la app. En el ejecutable de Windows, en <span class="kbd">%APPDATA%\\Takenotes</span>. Nada sale de tu máquina, y puedes exportarlo en JSON o Markdown.</p>
+          </details>
+          <details>
+            <summary>¿Puedo importar mi workspace de Notion?</summary>
+            <p>Sí. Exporta en Notion con Configuración → Exportar → Markdown y CSV, descarga el .zip y usa el icono de importar. Se reconstruyen páginas, jerarquía, bases de datos e imágenes.</p>
+          </details>
+          <details>
+            <summary>¿Funciona sin internet?</summary>
+            <p>Sí. La app es 100 % local y no hace peticiones de red en tiempo de ejecución. Solo necesitas internet para descargarla la primera vez.</p>
+          </details>
+          <details>
+            <summary>¿Es un clon de Notion?</summary>
+            <p>No. Replica las funciones principales con interfaz y código propios. No incluye colaboración en tiempo real, IA ni publicaciones web.</p>
+          </details>
+          <details>
+            <summary>¿Hay versión para macOS o Linux?</summary>
+            <p>El build web funciona en cualquier navegador moderno. El ejecutable de escritorio es Windows por ahora; el launcher de Python es multiplataforma y acepta contribuciones.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <a class="brand" href="#" aria-label="Takenotes, inicio">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="#FDFCF8" stroke="rgba(46,42,38,.14)"/>
+          <path d="M9 22.5c2.6-.4 3.5-7.7 4.6-11.4.9-3 2.4-2.6 3.3.3.5 1.6 1 3.9 1.4 5.7" stroke="#2E2A26" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M20.5 9.5h3.2M20.5 14h3.2M20.5 18.5h3.2" stroke="#C65D3B" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <b>Takenotes</b>
+      </a>
+      <span>© 2026 Takenotes contributors · MIT · Hecho en español.</span>
+      <nav aria-label="Enlaces del pie">
+        <a href="https://github.com/pureform132/takenotes" rel="noopener">GitHub</a>
+        <a href="https://github.com/pureform132/takenotes/blob/main/LICENSE" rel="noopener">Licencia</a>
+        <a href="https://github.com/pureform132/takenotes/issues" rel="noopener">Issues</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
