@@ -2,7 +2,7 @@
 
 ## Nuestro compromiso
 
-Queremos que participar en Takenotes sea una experiencia libre de acoso para todo el mundo, sin importar edad, identidad, experiencia, nacionalidad, apariencia, religión u orientación.
+Queremos que participar en MEGAnote sea una experiencia libre de acoso para todo el mundo, sin importar edad, identidad, experiencia, nacionalidad, apariencia, religión u orientación.
 
 ## Qué esperamos
 

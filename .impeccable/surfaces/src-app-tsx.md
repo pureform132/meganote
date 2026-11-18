@@ -5,7 +5,7 @@ primary_target: "src/App.tsx"
 related_targets: []
 ---
 
-# Surface brief: Takenotes — app shell (Operate)
+# Surface brief: MEGAnote — app shell (Operate)
 
 ## Scope and mode
 
@@ -13,7 +13,7 @@ Operate surface, full app screen (not a landing page). The visitor came to get a
 
 ## Audience, job, constraints
 
-Individuals organizing personal notes and projects (PRODUCT.md). Job: capture a thought, structure it later, find it fast. Constraints: max 4 colors, all light; Takenotes branding, independent implementation; must read as a product of its category (notes/wiki), not a poster; controls are standard web components; keyboard-first (Ctrl/Cmd+K palette); motion exponential ease-out, quiet; must state its local/offline nature honestly.
+Individuals organizing personal notes and projects (PRODUCT.md). Job: capture a thought, structure it later, find it fast. Constraints: max 4 colors, all light; MEGAnote branding, independent implementation; must read as a product of its category (notes/wiki), not a poster; controls are standard web components; keyboard-first (Ctrl/Cmd+K palette); motion exponential ease-out, quiet; must state its local/offline nature honestly.
 
 ## Chosen direction
 
@@ -33,11 +33,11 @@ Paper `#FDFCF8` ground, ink `#2E2A26` text/rules, terracotta `#C65D3B` for actio
 
 ## STORY
 
-A person opens Takenotes offline, their notebook is already there; they type a thought into a blank page, summon the slash menu, file it under a project, close the tab. Everything was instant, private, and theirs.
+A person opens MEGAnote offline, their notebook is already there; they type a thought into a blank page, summon the slash menu, file it under a project, close the tab. Everything was instant, private, and theirs.
 
 ## FIRST VIEWPORT
 
-Left sidebar (264px): wordmark "Takenotes", search field (`Ctrl/Cmd+K` hint), "New page" terracotta pill button, page tree with twisties, favorites group, trash at the bottom. Center (fluid): editor on paper with the page title in display serif, blocks below, empty-state prompt line. Right: none by default; command palette overlays center. The signature move: the active page in the sidebar carries a small terracotta ink-stroke tab at its leading edge — an authored SVG glyph (≤30% of row height), not a full-height accent bar.
+Left sidebar (264px): wordmark "MEGAnote", search field (`Ctrl/Cmd+K` hint), "New page" terracotta pill button, page tree with twisties, favorites group, trash at the bottom. Center (fluid): editor on paper with the page title in display serif, blocks below, empty-state prompt line. Right: none by default; command palette overlays center. The signature move: the active page in the sidebar carries a small terracotta ink-stroke tab at its leading edge — an authored SVG glyph (≤30% of row height), not a full-height accent bar.
 
 ## FORM
 

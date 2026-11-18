@@ -1,187 +1,99 @@
-# Takenotes
+# MEGAnote
 
-**Tus notas, en papel.** Una app de notas **local-first**, open source y en español, con las funciones esenciales de Notion: editor de bloques, páginas anidadas, bases de datos con cuatro vistas, búsqueda a texto completo e importación desde Notion.
+**Tus notas, en papel.** Una app de notas local-first con las funciones de Notion — editor de bloques, comandos con `/`, páginas anidadas, búsqueda a texto completo y bases de datos con **7 vistas** (Tabla / Tablero kanban / **Galería con portadas** / Lista / Línea de tiempo / Calendario / **Gráfico**) — reconstruida desde cero como un cuaderno cálido y tranquilo. **Sin cuenta. Sin nube. Sin telemetría.** Tus páginas se guardan en el IndexedDB de esta máquina y nunca salen de ella.
 
-**Sin cuenta. Sin nube. Sin telemetría.** Todo se guarda en tu máquina.
+> El branding y la interfaz son propios. Solo se replicaron las *funciones* de la app de escritorio de Notion (v7.44.0, analizada localmente con REA): estructura shell+tabs, `notion://`, almacenamiento offline estilo SQLite, árbol de páginas, vistas de base de datos, inserción con `/`.
+> **No se reutiliza ningún código, asset, token ni texto de Notion** — la implementación es original.
+> El análisis se hizo leyendo el paquete MSIX instalado (el pipeline de import/export de Notion es remoto; el shell solo orquesta por IPC). Por eso el importador usa el **export oficial Markdown y CSV** de Notion.
 
-**[Web](https://pureform132.github.io/takenotes/) · [Descargar para Windows](https://github.com/pureform132/takenotes/releases/latest) · [Demo en el navegador](https://pureform132.github.io/takenotes/app.html) · [Capturas](docs/screenshots/)**
+**Nota de renombrado (MEGAnote → MEGAnote):** tus notas no se pierden — en el primer arranque MEGAnote migra solo el almacén antiguo (IndexedDB `meganote` → `meganote`) y copia `%APPDATA%\MEGAnote` → `%APPDATA%\MEGAnote`.
 
-[![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-C65D3B?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/pureform132/takenotes?style=flat-square&color=9AA88A)](https://github.com/pureform132/takenotes/releases/latest)
-[![Plataforma](https://img.shields.io/badge/Windows%20%7C%20Web-2E2A26?style=flat-square)](#descargar)
-[![Hecho con React 19 + TypeScript](https://img.shields.io/badge/React%2019%20%2B%20TypeScript-9AA88A?style=flat-square)](#stack)
-
-<p align="center">
-  <img src="docs/screenshots/light-editor.png" alt="Takenotes en modo claro: editor de bloques con páginas anidadas, búsqueda y barra lateral" width="100%" />
-</p>
-
-## Por qué existe
-
-Notion es extraordinario, pero para muchas personas es demasiado: cuenta obligatoria, nube, planes que cambian, datos fuera de casa. **Takenotes** conserva lo que de verdad se usa a diario y lo reduce a un cuaderno cálido que abre al instante:
-
-- **Tus notas viven en tu equipo** (IndexedDB en la app, `%APPDATA%\Takenotes` en Windows). Nada viaja a un servidor.
-- **Gratis y libre**, licencia MIT: puedes leerlo, modificarlo, redistribuirlo y auditarlo.
-- **En español**, pensado y escrito en español, no traducido a posteriori.
-- **13 MB, no 350 MB**: ventana nativa sobre WebView2 en lugar de un navegador empaquetado.
-
-> No es un clon de Notion. Replica sus *funciones* principales con una interfaz propia, y no incluye colaboración en tiempo real, IA ni publicaciones web.
-
-## Capturas
-
-| Editor y páginas anidadas | Bases de datos — tabla |
-|---|---|
-| ![Editor de bloques de Takenotes con encabezados, listas y callouts](docs/screenshots/light-editor.png) | ![Vista de tabla de una base de datos con estados, prioridades y fechas](docs/screenshots/db-table.png) |
-
-| Tablero Kanban | Gráfico de barras |
-|---|---|
-| ![Tablero kanban agrupado por estado con arrastrar y soltar](docs/screenshots/db-board.png) | ![Gráfico de barras por estado generado desde la base de datos](docs/screenshots/db-chart.png) |
-
-| Modo oscuro — The Night Desk | Búsqueda a texto completo (Ctrl+K) |
-|---|---|
-| ![Takenotes en modo oscuro, con papel ember cálido y tinta luminosa](docs/screenshots/dark_editor.png) | ![Paleta de búsqueda con resultados y fragmentos resaltados](docs/screenshots/light-search_wait.png) |
-
-| Comandos con `/` | Importar desde Notion |
-|---|---|
-| ![Menú de comandos para insertar 14 tipos de bloque](docs/screenshots/slash.png) | ![Detalle del importador de Notion con los pasos para subir el .zip](docs/screenshots/import-detail.png) |
-
-| Varios workspaces | Calendario |
-|---|---|
-| ![Selector de workspaces con Personal y Trabajo](docs/screenshots/workspaces.png) | ![Vista de calendario mensual con filas por fecha](docs/screenshots/db-calendar.png) |
-
-| Galería de base de datos | Gráfico donut |
-|---|---|
-| ![Vista de galería con tarjetas, estados y fechas](docs/screenshots/gallery.png) | ![Gráfico donut con leyenda y porcentajes](docs/screenshots/chart-donut.png) |
-
-| 43 stickers para el encabezado | Tabla de contenido |
-|---|---|
-| ![Selector de stickers con buscador y grupos](docs/screenshots/stickers.png) | ![Bloque de tabla de contenido con encabezados navegables](docs/screenshots/toc.png) |
-
-## Funciones
-
-- **Editor de bloques** — texto, H1–H3, listas, to-dos, toggles, citas, código, destacados, divisores, imágenes y adjuntos de cualquier tipo.
-- **Escribe haciendo clic en el papel** — el espacio libre bajo el contenido crea un bloque y coloca el cursor, como en Notion.
-- **Arrastra páginas para anidarlas** — desde el árbol lateral, una tarjeta de subpágina, un enlace o una miga; suéltala sobre una página, una fila, una tarjeta o una base de datos.
-- **Subpáginas** — crea una página dentro de otra desde el encabezado o con `/subpágina`; la tarjeta muestra su icono, título y número de hijas.
-- **Stickers y portadas** — 43 iconos propios con buscador y seis portadas planas de la paleta.
-- **Tabla de contenido** — `/toc` genera un índice navegable desde los encabezados H1–H3.
-- **Duplicar y mover** — copia una página con todo su subárbol o muévela con un buscador de destinos.
-- **Enlaces y backlinks** — menciona páginas con `/enlace` y descubre quién te menciona en «Mencionada en».
-- **Menú `/`** — 17 tipos de bloque, navegable con teclado.
-- **Formato inline** — `Ctrl+B` negrita, `Ctrl+I` itálica, `Ctrl+Shift+X` tachado, `Ctrl+\`` código.
-- **Atajos Markdown** — `#`, `##`, `###`, `-`, `1.`, `[]`, `>`, ` ``` ` al inicio de un bloque.
-- **Páginas dentro de páginas** — árbol sin límite, favoritos y papelera reversible.
-- **Bases de datos** — texto, número, selección, fecha y casilla; cinco vistas: **tabla**, **kanban**, **calendario**, **galería** y **gráfico**.
-- **Gráficos** — barras, horizontal, líneas/área y donut; agrupa por selección, fecha, casilla o texto y elige recuento, suma o media.
-- **Búsqueda a texto completo** — `Ctrl/Cmd+K` sobre títulos, bloques y filas de bases de datos.
-- **Varios workspaces** — cuadernos separados (Personal, Trabajo, …) con su propio árbol.
-- **Importar desde Notion** — el export oficial **Markdown y CSV**: páginas, jerarquía, bases de datos e imágenes.
-- **Modo oscuro** — «The Night Desk», los mismos cuatro matices invertidos.
-- **Copias de seguridad** — JSON completo con restauración validada y exportación de cada página a Markdown.
-
-## Takenotes frente a Notion
-
-| | Takenotes | Notion |
-|---|---|---|
-| Cuenta | **No hace falta** | Obligatoria |
-| Dónde viven tus datos | **Tu máquina** | Servidores de Notion |
-| Precio | **Gratis (MIT)** | Freemium |
-| Funciona sin internet | **Sí** | Limitado |
-| Tamaño de la app de escritorio | **~13 MB** | Cientos de MB |
-| Colaboración en tiempo real | No | Sí |
-| IA / publicaciones web | No | Sí |
-
-## Descargar
-
-### Windows (recomendado)
-
-1. Descarga **`Takenotes.exe`** desde [la última release](https://github.com/pureform132/takenotes/releases/latest).
-2. Doble clic. No hay instalador: es un único ejecutable de ~13 MB sobre WebView2.
-3. Tus notas se guardan en `%APPDATA%\Takenotes`.
-
-> El ejecutable no está firmado con un certificado de pago, así que Windows SmartScreen puede avisar la primera vez: **Más información → Ejecutar de todas formas**. El código completo está aquí para auditarlo.
-
-### Navegador, sin instalar nada
-
-Abre **[la demo](https://pureform132.github.io/takenotes/app.html)**. Es el mismo build en un único archivo HTML autocontenido; los datos quedan en el IndexedDB de ese navegador.
-
-### Desde el código
+## Ejecutarlo
 
 ```bash
-git clone https://github.com/pureform132/takenotes.git
-cd takenotes
-npm install
-npm run dev      # desarrollo
-npm run build    # build de producción en dist/
+npm install     # solo si falta node_modules
+npm run dev     # desarrollo
+npm run build   # build de producción
+npm run preview # servir el build
 ```
 
-Para generar el ejecutable de Windows, mira [Recompilar la app de escritorio](#recompilar-la-app-de-escritorio).
+**App de escritorio (Windows):** `MEGAnote.exe` en tu Escritorio (también en `release-py/`). Ventana nativa sobre WebView2, ~13 MB, notas persistentes en `%APPDATA%\MEGAnote`. Doble clic y escribe. Ver abajo "Recompilar la app de escritorio".
 
-## Importar tu workspace de Notion
+## Funcionalidades
 
-1. En Notion: **Configuración → Exportar → Markdown y CSV** (incluye subpáginas y bases de datos) y descarga el `.zip`.
-2. En Takenotes: icono de **importar** en el pie de la barra lateral.
-3. **Elegir .zip…** — el importador reconstruye páginas, jerarquía, bloques, bases de datos CSV (con tipos inferidos) e imágenes relativas.
+- **Editor de bloques** — texto, H1–H3, listas, to-dos, toggles, citas, código, destacados, divisores, imágenes (URL/archivo ≤1.5 MB) y **archivos** (cualquier tipo, ≤8 MB)
+- **Iconos de página** — más de **70 iconos propios** (buscador incluido), con opción de cambiar el de cualquier página u objeto desde el encabezado, igual que en Notion
+- **Formato inline** — `Ctrl/Cmd+B` negrita, `Ctrl/Cmd+I` itálica, `Ctrl/Cmd+Shift+X` tachado, `Ctrl+\`` código
+- **Menú `/`** — 14 tipos de bloque, navegable con teclado
+- **Atajos Markdown** — `#`, `##`, `###`, `-`, `1.`, `[]`, `>`, ` ``` ` al inicio convierten al pulsar espacio
+- **Páginas anidadas** — árbol infinito en la barra lateral; favoritos; papelera reversible (hasta vaciar); las subpáginas se muestran dentro de cada página
+- **Búsqueda** — `Ctrl/Cmd+K`: salto rápido y búsqueda de texto completo en títulos, bloques **y filas de bases de datos**
+- **Bases de datos** — texto, número (con **formatos**: simple, separador, %, 25 monedas y decimales 0–5), selección y **selección múltiple** (ambas con **paleta de 10 colores** al estilo Notion), fecha, casilla, **URL**, **correo** y **teléfono** (celdas de enlace). Vistas (7):
+  - **Tabla** (ordenar, filtrar, editar inline, columnas add/rename/delete)
+  - **Tablero** (kanban con drag & drop, agrupado por cualquier selección)
+  - **Galería** (tarjetas con **portada de imagen** — URL o archivo ≤1.5 MB, botón 📷 al pasar el ratón — y hasta 3 propiedades)
+  - **Lista** (filas compactas agrupadas por selección)
+  - **Línea de tiempo** (ejes de meses; cada fila como hito sobre su fecha)
+  - **Calendario** (mes, clic en un día añade fila con fecha)
+  - **Gráfico** (barras SVG coloreadas; agrupa por **cualquier** columna: selección, fecha, casilla, texto o número)
+- **Menú de propiedad** (clic en el encabezado de columna) — renombrar, **cambiar el tipo** (con conversión de valores, como en Notion), formato y decimales del número, color y texto de cada opción, duplicar, eliminar y ordenar
+- **Escribir en cualquier parte** — clic en el lienzo vacío (o en la franja inferior) crea/enfoca un bloque ahí, como en Notion
+- **Subpáginas visibles** — cada página y base de datos lista sus subpáginas; el botón `+` en el árbol (al pasar el ratón) crea una subpágina. Las páginas cuyo padre ya no existe se muestran en la raíz, nunca desaparecen
+- **Deshacer / Rehacer globales** — botones en el pie de la barra lateral y `Ctrl/Cmd+Z` · `Ctrl/Cmd+Y` (o `Ctrl/Cmd+Shift+Z`), con ráfagas de tecleo agrupadas
+- **Workspaces** — varios cuadernos con selector en la barra lateral (crear, cambiar, renombrar): Personal, Trabajo… cada uno con su árbol. Tus datos anteriores se migran solos a "Personal" en el primer arranque
+- **Importar desde Notion** — en Notion: Configuración → **Exportar** → **Markdown y CSV** → descarga el .zip, en MEGAnote: icono de importar en el pie de la barra lateral → *Elegir .zip…* → tus páginas, jerarquía, bases de datos (CSV → tabla con tipos inferidos) e imágenes quedan importadas
+- **Copia de seguridad completa** — botón de descarga (JSON) y restauración validada con confirmación; descarga de cualquier página como Markdown
+- **Modo oscuro** — botón sol/luna en el pie de la barra lateral; "The Night Desk", los mismos 4 matices invertidos, persiste y sigue a tu SO en el primer arranque
 
-Límites honestos: las imágenes de hasta **1,5 MB** se incrustan; los adjuntos que no son imagen se conservan como referencia textual. Los bloques de Notion sin equivalente (p. ej. synced blocks o relaciones entre bases de datos) se degradan a texto.
+## Datos — que nunca se pierdan
 
-## Tus datos son tuyos
+Auto-guardado local con indicador en vivo `Guardado · HH:MM`. Los cambios estructurales de bases de datos (tipos, columnas, opciones, filas) se guardan **al instante**; el tecleo se agrupa en 350 ms. Además la app intenta volcar el almacén al quedar oculta/cerrar (`pagehide`/`blur`) y pide almacenamiento persistente al navegador. Por eso, además:
 
-- **Auto-guardado** con debounce de 350 ms e indicador «Guardado · HH:MM».
-- **Copia JSON** y **restauración validada** desde la barra lateral.
-- **Markdown por página** para llevarte cualquier texto a otra herramienta.
-- **Cero peticiones de red en tiempo de ejecución**: fuentes e iconos van dentro del build. No hay analítica ni telemetría.
+- **Copia (JSON)** — descarga tu notebook entero como archivo en cualquier disco/Drive/USB
+- **Restaurar (JSON)** — eliges un backup, MEGAnote lo valida, pide confirmación y restaura
+- **Markdown** — botón de exportar en cada página
+- **Escritorio** — el perfil WebView2 vive en `%APPDATA%\MEGAnote`, independiente del navegador
 
-## Stack
+> Nada sale de tu máquina salvo que pulses tú el botón de backup.
 
-React 19 · Vite 7 · TypeScript · IndexedDB · jszip + papaparse (importador) · PyInstaller + pywebview (escritorio). Sin backend.
+## Stack y estructura
+
+React 19 · Vite 7 · TypeScript · IndexedDB (hand-rolled, sin deps) · jszip + papaparse (importador) · sin backend.
 
 ```
 src/
   App.tsx                  esqueleto: sidebar + lienzo + paleta + avisos
-  state/WorkspaceContext   estado global, auto-guardado, backups, importación
+  state/WorkspaceContext   fuente única de verdad; save debounced + backups + importación
   lib/
-    types.ts               bloques, páginas, bases de datos, workspaces
-    db.ts                  IndexedDB + migración v1→v2
-    notionImport.ts        export Markdown y CSV de Notion → páginas y tablas
-    export.ts              backup JSON + Markdown
-    html.ts                sanitizador de HTML inline
-    theme.ts               tema claro/oscuro
-  components/              Sidebar, Editor, DatabaseView, SearchPalette...
-  styles/app.css           sistema de diseño (4 matices + color-mix)
-docs/                      landing page (GitHub Pages) y capturas
-scripts/                   launcher de escritorio e iconos
+    types.ts               modelo (bloques, páginas, bases de datos, AppStore multi-workspace)
+    db.ts                  IndexedDB + migración v1→v2 ("Personal")
+    seed.ts                cuaderno inicial en español
+    notionImport.ts        importador del export oficial de Notion (md + csv → páginas/dbs)
+    export.ts              exportes: JSON backup, Markdown
+    html.ts                sanitizador de inline HTML
+    theme.ts, icons.tsx    tema claro/oscuro + iconografía propia (SVG)
+  components/              Sidebar (switcher/backups/importar), Editor (bloques),
+                           DatabaseView (tabla/tablero/calendario/gráfico),
+                           SearchPalette, SlashMenu, TrashView
+  styles/app.css           sistema de diseño (4 matices + color-mix + tema [data-theme=dark])
 ```
 
 ## Recompilar la app de escritorio
 
 ```powershell
-npm run build
-python -m venv .venv-release
+npm run build                                     # refresca dist/
+python -m venv .venv-release                      # una vez
 .venv-release\Scripts\pip install pywebview pyinstaller
-.venv-release\Scripts\pyinstaller --onefile --noconsole --name Takenotes ^
-  --icon scripts\icon.ico --add-data "dist;dist" --distpath release-py scripts\takenotes_app.py
+.venv-release\Scripts\python scripts\meganote_app.py   # prueba la ventana
+.venv-release\Scripts\pyinstaller --onefile --noconsole --name MEGAnote --icon scripts\icon.ico --add-data "dist;dist" --distpath release-py scripts\meganote_app.py
 ```
 
-El resultado queda en `release-py/Takenotes.exe`.
+Iconos rasterizados desde `public/favicon.svg` con `scripts/make-icon.cjs` → `scripts/icon.ico`.
 
-## Contribuir
+## Notas
 
-Las contribuciones son bienvenidas: errores, traducciones, accesibilidad, nuevas vistas o mejoras del importador. Lee [CONTRIBUTING.md](CONTRIBUTING.md) y abre un issue antes de cambios grandes.
-
-## Preguntas frecuentes
-
-**¿Es realmente gratis?** Sí. MIT, sin plan de pago, sin registro y sin límites de páginas.
-
-**¿Dónde se guardan mis notas?** En IndexedDB dentro de la app. En el ejecutable de Windows, en `%APPDATA%\Takenotes`. Puedes exportarlas cuando quieras.
-
-**¿Funciona sin internet?** Sí, el 100 % de la app es local. Solo necesitas internet para descargarla.
-
-**¿Puedo importar desde Notion?** Sí, con el export oficial Markdown y CSV. También acepta backups JSON de Takenotes.
-
-**¿Hay versión para macOS o Linux?** El build web funciona en cualquier navegador moderno. El ejecutable de escritorio es Windows por ahora; el launcher de Python es multiplataforma y acepta PRs.
-
-**¿Reemplaza a Notion?** Para notas personales, bases de datos y planificación, sí. Si necesitas colaboración en tiempo real o IA, no.
-
-## Licencia
-
-[MIT](LICENSE) © 2026 Takenotes contributors. Haz lo que quieras, conserva el aviso de copyright.
+- **Propiedades al estilo Notion:** el catálogo de tipos, la paleta de 10 colores de opción (`default/gray/brown/orange/yellow/green/blue/purple/pink/red`), los formatos numéricos y el flujo "cambiar tipo con conversión de valores" se extrajeron del **cliente web de Notion v7.44.0** (paquete MSIX + caché del cliente web) con REA. La implementación es propia; no se reutiliza código de Notion.
+- `PRODUCT.md` y `DESIGN.md` son el registro de producto y diseño (flujo Impeccable). El sistema incluye **modo oscuro documentado** ("The Night Desk Rule").
+- `npm run build` pasa `tsc -b` limpio; detector Impeccable: **0 hallazgos** mecánicos en `src/`.
+- `node_modules` solo hace falta para desarrollar; restaura con `npm install`.
+- Los documentos `PRODUCT.md`/`DESIGN.md` están en inglés por convención del flujo de diseño; la UI de la app está en español.

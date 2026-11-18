@@ -1,29 +1,9 @@
 {
-    "name": "takenotes",
+    "name": "meganote",
     "private": true,
-    "version": "1.2.0",
-    "description": "App de notas open source, local-first y en español con las funciones de Notion: bloques, bases de datos, búsqueda e importación.",
+    "version": "1.0.0",
+    "description": "MEGAnote - tus notas, en papel. Alternativa a Notion local-first: bloques, bases de datos con 7 vistas, búsqueda instantánea y copias de seguridad. Sin cuenta, sin nube, sin telemetría.",
     "type": "module",
-    "license": "MIT",
-    "homepage": "https://pureform132.github.io/takenotes/",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/pureform132/takenotes.git"
-    },
-    "keywords": [
-        "notion-alternative",
-        "notes",
-        "note-taking",
-        "local-first",
-        "offline-first",
-        "indexeddb",
-        "react",
-        "typescript",
-        "block-editor",
-        "kanban",
-        "productivity",
-        "spanish"
-    ],
     "scripts": {
         "dev": "vite",
         "build": "tsc -b && vite build",

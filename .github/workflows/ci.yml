@@ -23,6 +23,6 @@ jobs:
       - name: Publicar build web como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: takenotes-web
+          name: meganote-web
           path: dist/index.html
           if-no-files-found: error

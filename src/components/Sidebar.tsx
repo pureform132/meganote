@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Icon, type IconName } from '../lib/icons';
-import { getPageDrag, hasPageDrag, setPageDrag } from '../lib/pageDrag';
 import { parseNotionExport } from '../lib/notionImport';
 import { currentTheme, toggleTheme, type Theme } from '../lib/theme';
 import type { Page } from '../lib/types';
 
-const EXPANDED_KEY = 'takenotes.expanded';
+const EXPANDED_KEY = 'meganote.expanded';
+const LEGACY_EXPANDED_KEY = 'meganote.expanded';
 
 function loadExpanded(): Set<string> {
   try {
-    return new Set(JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[]);
+    const raw = localStorage.getItem(EXPANDED_KEY) ?? localStorage.getItem(LEGACY_EXPANDED_KEY) ?? '[]';
+    return new Set(JSON.parse(raw) as string[]);
   } catch {
     return new Set();
   }
@@ -18,13 +19,13 @@ function loadExpanded(): Set<string> {
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const {
-    pages, byId, activePageId, setActivePageId, createPage, movePage, toggleFavorite, trashPage,
+    pages, activePageId, setActivePageId, createPage, toggleFavorite, trashPage,
     setSearchOpen, setShowTrash, showTrash, trashCount,
     notebooks, currentNotebookId, currentNotebookName, setCurrentNotebook, createNotebook, renameNotebook,
     exportBackup, importBackup, importPages, saveState, savedAt,
+    undo, redo, canUndo, canRedo,
   } = useWorkspace();
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
-  const [dropId, setDropId] = useState<string | null>(null);
 
   const [wsMenuOpen, setWsMenuOpen] = useState(false);
   const [creatingWs, setCreatingWs] = useState(false);
@@ -72,8 +73,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
   const childrenOf = useMemo(() => {
     const map = new Map<string | null, Page[]>();
+    const ids = new Set(pages.map((p) => p.id));
     for (const p of pages) {
-      const key = p.parentId;
+      // una página cuyo padre no existe (p. ej. importada o restaurada) se muestra en la raíz
+      const key = p.parentId && ids.has(p.parentId) ? p.parentId : null;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(p);
     }
@@ -81,6 +84,13 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   }, [pages]);
 
   const favorites = pages.filter((p) => p.favorite);
+
+  // al abrir una página con subpáginas, se despliega su rama (las subnotas siempre a la vista)
+  useEffect(() => {
+    if (!activePageId) return;
+    if ((childrenOf.get(activePageId) ?? []).length === 0) return;
+    setExpanded((prev) => (prev.has(activePageId) ? prev : new Set(prev).add(activePageId)));
+  }, [activePageId, childrenOf]);
 
   const confirmImport = async () => {
     if (!pendingImport) return;
@@ -116,44 +126,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     setWsMenuOpen(false);
   };
 
-  const moveInto = (targetId: string, e: DragEvent) => {
-    const draggedId = getPageDrag(e);
-    if (!draggedId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setDropId(null);
-    if (draggedId === targetId) return;
-    const dragged = byId.get(draggedId);
-    const target = byId.get(targetId);
-    if (!dragged || !target) return;
-    if (dragged.parentId === targetId) {
-      setExpanded((prev) => new Set(prev).add(targetId));
-      setNotice({ kind: 'ok', text: `«${dragged.title || 'Sin título'}» ya está dentro de «${target.title || 'Sin título'}».` });
-      return;
-    }
-    if (!movePage(draggedId, targetId)) {
-      setNotice({ kind: 'err', text: 'No puedes mover una página dentro de sí misma ni de una de sus subpáginas.' });
-      return;
-    }
-    setExpanded((prev) => new Set(prev).add(targetId));
-    setNotice({ kind: 'ok', text: `«${dragged.title || 'Sin título'}» ahora es una subpágina de «${target.title || 'Sin título'}».` });
-  };
-
-  const dropProps = (targetId: string) => ({
-    onDragOver: (e: DragEvent) => {
-      if (!hasPageDrag(e)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
-      setDropId(targetId);
-    },
-    onDragLeave: (e: DragEvent) => {
-      const next = e.relatedTarget as Node | null;
-      if (!next || !e.currentTarget.contains(next)) setDropId((current) => (current === targetId ? null : current));
-    },
-    onDrop: (e: DragEvent) => moveInto(targetId, e),
-  });
-
   const renderTree = (parentId: string | null, depth: number) => {
     const kids = childrenOf.get(parentId) ?? [];
     return kids.map((p) => {
@@ -163,12 +135,8 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       return (
         <div key={p.id} role="treeitem" aria-expanded={hasKids ? isOpen : undefined}>
           <button
-            className={`treerow${activePageId === p.id && !showTrash ? ' is-active' : ''}${dropId === p.id ? ' is-drop' : ''}`}
+            className={`treerow${activePageId === p.id && !showTrash ? ' is-active' : ''}`}
             style={{ paddingLeft: `${2 + depth * 14}px` }}
-            data-page-id={p.id}
-            draggable
-            onDragStart={(e) => setPageDrag(e, p.id)}
-            {...dropProps(p.id)}
             onClick={() => {
               setActivePageId(p.id);
               setShowTrash(false);
@@ -205,7 +173,22 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               <Icon name={(p.icon || 'doc') as IconName} size={15} />
             </span>
             <span className="treerow__title">{p.title || 'Sin título'}</span>
+            {hasKids && !isOpen && (
+              <span className="treerow__count" title={`${kids2.length} subpágina${kids2.length === 1 ? '' : 's'}`}>{kids2.length}</span>
+            )}
             <span className="treerow__actions">
+              <button
+                className="rowaction"
+                title="Nueva subpágina"
+                aria-label={`Crear subpágina de ${p.title || 'Sin título'}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  createPage(p.id, 'page');
+                  setExpanded((prev) => new Set(prev).add(p.id));
+                }}
+              >
+                <Icon name="plus" size={13} />
+              </button>
               <button
                 className={`rowaction${p.favorite ? ' is-fav' : ''}`}
                 title={p.favorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
@@ -243,7 +226,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <div className="sidebar__brand">
           <Icon name="logo" size={26} strokeWidth={1.7} className="sidebar__logo" />
           <div>
-            <h1 className="sidebar__wordmark">Takenotes</h1>
+            <h1 className="sidebar__wordmark">MEGAnote</h1>
             <p className="sidebar__tagline">LOCAL · TUYO · PARA SIEMPRE</p>
           </div>
         </div>
@@ -367,12 +350,8 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                 {favorites.map((p) => (
                   <button
                     key={p.id}
-                    className={`treerow${activePageId === p.id && !showTrash ? ' is-active' : ''}${dropId === p.id ? ' is-drop' : ''}`}
+                    className={`treerow${activePageId === p.id && !showTrash ? ' is-active' : ''}`}
                     style={{ paddingLeft: '4px' }}
-                    data-page-id={p.id}
-                    draggable
-                    onDragStart={(e) => setPageDrag(e, p.id)}
-                    {...dropProps(p.id)}
                     onClick={() => {
                       setActivePageId(p.id);
                       setShowTrash(false);
@@ -499,6 +478,26 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             Papelera
             {trashCount > 0 && <span className="trashbadge">{trashCount}</span>}
           </button>
+          <span className="sidebar__hist">
+            <button
+              className="iconbtn"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Deshacer (Ctrl+Z)"
+              aria-label="Deshacer"
+            >
+              <Icon name="undo" size={16} />
+            </button>
+            <button
+              className="iconbtn"
+              onClick={redo}
+              disabled={!canRedo}
+              title="Rehacer (Ctrl+Y)"
+              aria-label="Rehacer"
+            >
+              <Icon name="redo" size={16} />
+            </button>
+          </span>
           <button
             className="iconbtn"
             title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}

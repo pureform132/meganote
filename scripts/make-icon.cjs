@@ -1,4 +1,4 @@
-/* Rasterize the Takenotes SVG mark and pack it into a Windows .ico (PNG-in-ICO). */
+/* Rasterize the MEGAnote SVG mark and pack it into a Windows .ico (PNG-in-ICO). */
 const { Resvg } = require('@resvg/resvg-js');
 const fs = require('fs');
 const path = require('path');

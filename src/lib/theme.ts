@@ -1,9 +1,15 @@
-/* Tema claro/oscuro — toma el valor guardado, o el esquema del SO la primera vez. */
+/* Tema claro/oscuro — toma el valor guardado (con migración de la clave antigua),
+   o el esquema del SO la primera vez. */
 export type Theme = 'light' | 'dark';
-const KEY = 'takenotes.theme';
+const KEY = 'meganote.theme';
+const LEGACY_KEY = 'meganote.theme';
 
 export function currentTheme(): Theme {
-  const saved = localStorage.getItem(KEY);
+  let saved = localStorage.getItem(KEY);
+  if (saved !== 'light' && saved !== 'dark') {
+    saved = localStorage.getItem(LEGACY_KEY);
+    if (saved === 'light' || saved === 'dark') localStorage.setItem(KEY, saved);
+  }
   if (saved === 'light' || saved === 'dark') return saved;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }

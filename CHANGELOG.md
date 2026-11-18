@@ -35,7 +35,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [1.0.0] — 2026-11-17
 
-Primera versión pública de Takenotes.
+Primera versión pública de MEGAnote.
 
 ### Añadido
 

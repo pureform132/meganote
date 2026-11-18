@@ -1,5 +1,5 @@
 ---
-name: Takenotes Design System
+name: MEGAnote Design System
 description: The Paper Desk — local-first notes, ink on warm paper, terracotta action, sage state.
 colors:
   paper: "#FDFCF8"
@@ -152,13 +152,13 @@ components:
     padding: "2px 10px"
 ---
 
-# Design System: Takenotes
+# Design System: MEGAnote
 
 ## Overview
 
 **Creative North Star: "The Paper Desk"**
 
-Takenotes is a well-kept paper desk that happens to be software. Warm paper ground, ink for writing, a single terracotta pencil for action, and a sage pencil for state — nothing else on the desk. The interface is a calm working surface: hairline ink rules, quiet margins, generous measure, and type that behaves like hand-set print. Chrome recedes; the notes lead. It is explicitly *not* a dashboard, not a marketing landing band, and not a Notion clone with a renamed logo: the structure is familiar (sidebar tree, editor canvas, database lenses), the material is its own.
+MEGAnote is a well-kept paper desk that happens to be software. Warm paper ground, ink for writing, a single terracotta pencil for action, and a sage pencil for state — nothing else on the desk. The interface is a calm working surface: hairline ink rules, quiet margins, generous measure, and type that behaves like hand-set print. Chrome recedes; the notes lead. It is explicitly *not* a dashboard, not a marketing landing band, and not a Notion clone with a renamed logo: the structure is familiar (sidebar tree, editor canvas, database lenses), the material is its own.
 
 Modeled as ink on paper: text sits directly on the ground with no card boxes; depth is conveyed by ink density and layering, not elevation; the only cast shadows belong to buttons, and they are volumetric — a colored lip under a rounded pill, the way a good pen presses into the page.
 

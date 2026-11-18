@@ -1,4 +1,4 @@
-/* Authored icon set for Takenotes — single stroke weight, round caps/joins. No unicode glyphs. */
+/* Authored icon set for MEGAnote — single stroke weight, round caps/joins. No unicode glyphs. */
 import type { JSX } from 'react';
 
 export type IconName =
@@ -9,13 +9,13 @@ export type IconName =
   | 'code' | 'callout' | 'divider' | 'image' | 'database' | 'info' | 'arrowRight'
   | 'pen' | 'clock' | 'dot' | 'export' | 'warning' | 'notebook'
   | 'import' | 'chart' | 'file' | 'download' | 'moon'
-  /* page stickers & new page actions */
-  | 'heart' | 'sparkles' | 'coffee' | 'cake' | 'music' | 'camera' | 'rocket' | 'bulb'
-  | 'gift' | 'globe' | 'cloud' | 'flower' | 'mountain' | 'wave' | 'paw' | 'fish'
-  | 'pizza' | 'gamepad' | 'bike' | 'plane' | 'pin' | 'flag' | 'target' | 'crown'
-  | 'gem' | 'bookmark' | 'smile' | 'zap' | 'moonStar' | 'sprout'
-  | 'gallery' | 'toc' | 'subpage' | 'pageLink' | 'copy' | 'move' | 'backlink' | 'cover'
-  | 'chartLine' | 'chartDonut' | 'more';
+  | 'undo' | 'redo' | 'hash' | 'tags' | 'link' | 'mail' | 'phone' | 'duplicate'
+  | 'heart' | 'globe' | 'cloud' | 'flame' | 'zap' | 'music' | 'video' | 'camera'
+  | 'coffee' | 'gift' | 'bell' | 'lock' | 'key' | 'home' | 'building' | 'flag'
+  | 'mapPin' | 'plane' | 'car' | 'tree' | 'flower' | 'lightbulb' | 'rocket' | 'crown'
+  | 'gem' | 'apple' | 'bookmark' | 'inbox' | 'archive' | 'tag' | 'wallet' | 'target'
+  | 'trophy' | 'puzzle' | 'palette' | 'wrench' | 'pin' | 'megaphone' | 'umbrella'
+  | 'gamepad' | 'clapper';
 
 const paths: Record<IconName, JSX.Element> = {
   logo: (
@@ -252,245 +252,207 @@ const paths: Record<IconName, JSX.Element> = {
       <path d="M9 3v18M8 3v3.5M13.5 8h3M13.5 12h3M13.5 16h3" />
     </>
   ),
-  heart: (
-    <path d="M12 20.2S4 15.4 4 9.4A4.4 4.4 0 0 1 12 6.8a4.4 4.4 0 0 1 8 2.6c0 6-8 10.8-8 10.8Z" strokeLinejoin="round" />
-  ),
-  sparkles: (
+  undo: (
     <>
-      <path d="M12 3.5 13.6 9 19 10.6 13.6 12.2 12 17.7 10.4 12.2 5 10.6 10.4 9Z" strokeLinejoin="round" />
-      <path d="m18.5 15.5.7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7Z" />
+      <path d="M8.5 5.5 4 10l4.5 4.5" />
+      <path d="M4 10h10.2a5.4 5.4 0 0 1 0 10.8H11" />
     </>
   ),
-  coffee: (
+  redo: (
     <>
-      <path d="M5 8.5h12V15a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4Z" />
-      <path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3.5v2M12 2.5v3" />
+      <path d="M15.5 5.5 20 10l-4.5 4.5" />
+      <path d="M20 10H9.8a5.4 5.4 0 0 0 0 10.8H13" />
     </>
   ),
-  cake: (
+  hash: <path d="M9.5 4 7.5 20M16.5 4l-2 16M4.5 9h15.5M3.5 15h15.5" />,
+  heart: <path d="M12 20s-6.5-4.3-9-9a5.2 5.2 0 0 1 9-4.6A5.2 5.2 0 0 1 21 11c-2.5 4.7-9 9-9 9Z" />,
+  globe: (
     <>
-      <path d="M4.5 20h15v-7h-15Z" strokeLinejoin="round" />
-      <path d="M3.5 20h17M8 13V9M16 13V9" />
-      <path d="M8 6.5c0-1 1.5-1.5 1.5-2.5M16 6.5c0-1 1.5-1.5 1.5-2.5" />
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c-3.2 2.9-5 5.5-5 8.5s1.8 5.6 5 8.5M12 3.5c3.2 2.9 5 5.5 5 8.5s-1.8 5.6-5 8.5" />
     </>
   ),
+  cloud: <path d="M7.5 18a4.5 4.5 0 0 1-.4-8.98A5.5 5.5 0 0 1 17.7 9.6 4.2 4.2 0 0 1 17.2 18Z" />,
+  flame: <path d="M12 3s5 4.6 5 9.6A5 5 0 0 1 12 17.6 5 5 0 0 1 7 12.6c0-1.6.6-2.8 1.6-4.4.7 1.5 1.5 2.3 2.9 3-.6-2-.6-4.6.5-8.2Z" />,
+  zap: <path d="M13 2 5 13.5h5.5L9.5 22 18 10.5h-5.5Z" />,
   music: (
     <>
-      <path d="M9 18V5.5l10-2V16" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="16" cy="16" r="3" />
+      <path d="M9 18.5V6l10-2.5V16" />
+      <circle cx="6.5" cy="18.5" r="2.5" />
+      <circle cx="16.5" cy="16" r="2.5" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="3" y="6.5" width="13" height="11" rx="2" />
+      <path d="m16 10.5 5-3.5v10l-5-3.5" />
     </>
   ),
   camera: (
     <>
-      <path d="M3.5 8.5h3l1.5-2h8l1.5 2h3v11h-17Z" strokeLinejoin="round" />
-      <circle cx="12" cy="14" r="3.4" />
+      <path d="M4 8h3.5l1.6-2.4a1.4 1.4 0 0 1 1.2-.6h3.4a1.4 1.4 0 0 1 1.2.6L16.5 8H20a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V9.5A1.5 1.5 0 0 1 4 8Z" />
+      <circle cx="12" cy="13.5" r="4" />
     </>
   ),
-  rocket: (
-    <>
-      <path d="M12 3c3.5 2 5.5 5.7 5.5 10L12 18l-5.5-5C6.5 8.7 8.5 5 12 3Z" strokeLinejoin="round" />
-      <circle cx="12" cy="10" r="1.6" />
-      <path d="m8.5 16.5-2 4 4-1M15.5 16.5l2 4-4-1" />
-    </>
-  ),
-  bulb: (
-    <>
-      <path d="M9.5 18h5M10.5 21h3" />
-      <path d="M8.2 14.3a6 6 0 1 1 7.6 0c-.8.7-1.3 1.6-1.3 2.7H9.5c0-1.1-.5-2-1.3-2.7Z" />
-    </>
-  ),
+  coffee: <path d="M5 9.5h11v6a4.5 4.5 0 0 1-4.5 4.5h-2A4.5 4.5 0 0 1 5 15.5Z M16 11.5h1.5a2.5 2.5 0 0 1 0 5H16" />,
   gift: (
     <>
-      <rect x="3.5" y="9" width="17" height="11" rx="1.5" />
-      <path d="M3.5 13h17M12 9v11" />
-      <path d="M12 9C9 9 7 7.8 7 6a2 2 0 0 1 4 0c0 1.5 1 3 1 3Zm0 0c3 0 5-1.2 5-3a2 2 0 0 0-4 0c0 1.5-1 3-1 3Z" />
+      <path d="M4 12h16v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20Z" />
+      <path d="M2.5 7.5h19V12h-19z M12 7.5V21 M12 7.5S10 4.5 8 4.5a2 2 0 1 0 .5 4H12M12 7.5S14 4.5 16 4.5a2 2 0 1 1-.5 4H12" />
     </>
   ),
-  globe: (
+  bell: <path d="M6 9.5a6 6 0 0 1 12 0c0 4 1.2 5.4 1.8 6a.9.9 0 0 1-.6 1.6H4.8a.9.9 0 0 1-.6-1.6c.6-.6 1.8-2 1.8-6ZM10 20.5a2 2 0 0 0 4 0" />,
+  lock: (
     <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.2-3.6-8.5S9.6 5.8 12 3.5Z" />
+      <rect x="5" y="10.5" width="14" height="9.5" rx="2" />
+      <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
     </>
   ),
-  cloud: (
-    <path d="M7 18.5h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.5 3.5 0 0 0 7 18.5Z" />
+  key: (
+    <>
+      <circle cx="8" cy="15" r="4.5" />
+      <path d="m11.5 11.5 8.5-8.5M15.5 7.5 18 10M13 10l2 2" />
+    </>
+  ),
+  home: (
+    <>
+      <path d="m4 11.5 8-7.5 8 7.5" />
+      <path d="M6.5 10.5V20h11v-9.5" />
+    </>
+  ),
+  building: (
+    <>
+      <path d="M5 21V4.5a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 15 4.5V21M15 10h4a1.5 1.5 0 0 1 1.5 1.5V21M3 21h18M8.5 7h2M8.5 11h2M8.5 15h2" />
+    </>
+  ),
+  flag: <path d="M6 21V4.5 M6 5h11l-2.75 4L17 13H6" />,
+  mapPin: (
+    <>
+      <path d="M12 21s-6.5-5.4-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.6 12 21 12 21Z" />
+      <circle cx="12" cy="10.5" r="2.3" />
+    </>
+  ),
+  plane: <path d="M10.5 21l3-7.5L4 10.5 3 7l7.5 1 4.5-4.5a2.3 2.3 0 0 1 3.3 3.3L13.8 12l1 7.5-3.8 1.5Z" />,
+  car: (
+    <>
+      <path d="M4 15.5V12a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3.5M4 12l2-6a2 2 0 0 1 1.9-1.5h8.2A2 2 0 0 1 18 6l2 6" />
+      <circle cx="7.5" cy="17.5" r="1.8" />
+      <circle cx="16.5" cy="17.5" r="1.8" />
+    </>
+  ),
+  tree: (
+    <>
+      <path d="M12 3 7.5 9.5h2L5 15.5h6.5" />
+      <path d="M12 3l4.5 6.5h-2L19 15.5h-6.5M12 15.5V21" />
+    </>
   ),
   flower: (
     <>
-      <circle cx="12" cy="12" r="2.2" />
-      <path d="M12 9.8C10.5 8.3 10 5.5 12 4c2 1.5 1.5 4.3 0 5.8ZM14.2 12c1.5-1.5 4.3-2 5.8 0-1.5 2-4.3 1.5-5.8 0ZM12 14.2c1.5 1.5 2 4.3 0 5.8-2-1.5-1.5-4.3 0-5.8ZM9.8 12C8.3 13.5 5.5 14 4 12c1.5-2 4.3-1.5 5.8 0Z" />
+      <circle cx="12" cy="12" r="2.4" />
+      <path d="M12 2.8c1.7 2.2 1.7 4.9 0 7.1-1.7-2.2-1.7-4.9 0-7.1ZM21 12c-2.2 1.7-4.9 1.7-7.1 0 2.2-1.7 4.9-1.7 7.1 0ZM12 21.2c-1.7-2.2-1.7-4.9 0-7.1 1.7 2.2 1.7 4.9 0 7.1ZM3 12c2.2-1.7 4.9-1.7 7.1 0-2.2 1.7-4.9 1.7-7.1 0Z" />
     </>
   ),
-  mountain: (
+  lightbulb: <path d="M12 2.5a6.5 6.5 0 0 0-3.8 11.8c.8.6 1.3 1.3 1.3 2.2h5c0-.9.5-1.6 1.3-2.2A6.5 6.5 0 0 0 12 2.5ZM10 21h4M11 24h2" />,
+  rocket: (
     <>
-      <path d="m3 19 6-10 4 6 2-3 6 7Z" strokeLinejoin="round" />
-      <circle cx="17" cy="6" r="1.6" />
+      <path d="M12 2.5c3 2.5 4.5 6.5 4.5 10.5L13 16h-2l-3.5-3C7.5 9 9 5 12 2.5Z" />
+      <path d="M9 13.5 6.5 16M15 13.5 17.5 16M12 16v5.5M10.5 23.5h3" />
     </>
   ),
-  wave: (
-    <path d="M3 9c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 3 3M3 15c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 3 3" />
-  ),
-  paw: (
+  crown: <path d="M4 8.5 7.5 11 12 4.5 16.5 11 20 8.5 18.5 18h-13Z" />,
+  gem: <path d="M7 4h10l4 5.5-9 11L3 9.5Z M3 9.5h18M9.5 4 8 9.5 12 20.5M14.5 4 16 9.5 12 20.5" />,
+  apple: <path d="M12 8c-4-1.5-7 1-7 5.5S9.5 21 12 21s7-3 7-7.5S16 6.5 12 8ZM12 8V5a2.5 2.5 0 0 1 2.5-2.5" />,
+  bookmark: <path d="M7 3.5h10A1.5 1.5 0 0 1 18.5 5v16L12 16.5 5.5 21V5A1.5 1.5 0 0 1 7 3.5Z" />,
+  inbox: (
     <>
-      <circle cx="8" cy="8" r="1.6" />
-      <circle cx="12" cy="6.5" r="1.6" />
-      <circle cx="16" cy="8" r="1.6" />
-      <path d="M12 11c-3 0-5 2.2-5 4.5 0 1.6 1.3 2.5 2.6 2 1-.4 1.6-.6 2.4-.6s1.4.2 2.4.6c1.3.5 2.6-.4 2.6-2C17 13.2 15 11 12 11Z" />
+      <path d="M3.5 13.5 6.8 6a2 2 0 0 1 1.9-1.4h6.6a2 2 0 0 1 1.9 1.4l3.3 7.5" />
+      <path d="M3.5 13.5V18a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-4.5M3.5 13.5H10a2 2 0 0 0 4 0h6.5" />
     </>
   ),
-  fish: (
+  archive: (
     <>
-      <path d="M4 12c3-4 7-5.5 11-4 1.5.5 2.8 1.3 4 2.5-1.2 1.2-2.5 2-4 2.5-4 1.5-8 0-11-1Z" />
-      <path d="M19 10.5 22 8v8l-3-2.5" />
-      <circle cx="8" cy="11.5" r="0.8" fill="currentColor" stroke="none" />
+      <rect x="3.5" y="4.5" width="17" height="4.5" rx="1.2" />
+      <path d="M5.5 9v9A1.5 1.5 0 0 0 7 19.5h10a1.5 1.5 0 0 0 1.5-1.5V9M10 12.5h4" />
     </>
   ),
-  pizza: (
+  tag: <path d="M20.2 12.3 12.7 19.8a1.9 1.9 0 0 1-2.7 0l-6-6V4h9.8l6.4 6.4a1.9 1.9 0 0 1 0 1.9Z M8.3 8.3h.01" />,
+  wallet: (
     <>
-      <path d="M12 3.5 21 20.5H3Z" strokeLinejoin="round" />
-      <path d="M12 3.5c2.8 0 5.6 1 8 3" />
-      <circle cx="10" cy="13" r="1" fill="currentColor" stroke="none" />
-      <circle cx="14.5" cy="15" r="1" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none" />
+      <path d="M4 7.5A2 2 0 0 1 6 5.5h11a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
+      <path d="M16 12.5h4.5v3H16a1.5 1.5 0 0 1 0-3Z" />
     </>
   ),
-  gamepad: (
-    <>
-      <path d="M6.5 7.5h11c2.5 0 4 2.5 3.5 5.2l-1 4.3c-.3 1.3-1.9 1.7-2.8.8l-1.6-1.6H8.4l-1.6 1.6c-.9.9-2.5.5-2.8-.8l-1-4.3C2.5 10 4 7.5 6.5 7.5Z" />
-      <path d="M8 10.5v3M6.5 12h3M15.5 11h.01M17.5 13h.01" />
-    </>
-  ),
-  bike: (
-    <>
-      <circle cx="6" cy="17" r="3.5" />
-      <circle cx="18" cy="17" r="3.5" />
-      <path d="M6 17 10 8h4l4 9M9 8h5M14 8l3 4" />
-    </>
-  ),
-  plane: (
-    <>
-      <path d="M3.5 13.5 20.5 4l-4 9.5-4.5 2-2 5-2-5-4.5-2Z" strokeLinejoin="round" />
-      <path d="m12 15.5 4.5-2" />
-    </>
-  ),
-  pin: (
-    <>
-      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </>
-  ),
-  flag: <path d="M5.5 21V4M5.5 5h11l-2 4 2 4h-11" />,
   target: (
     <>
       <circle cx="12" cy="12" r="8.5" />
-      <circle cx="12" cy="12" r="4.5" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
     </>
   ),
-  crown: (
+  trophy: <path d="M8 4.5h8V8a4 4 0 0 1-8 0ZM8 6H4.5a1 1 0 0 0-1 1c0 3 1.6 5 4.5 5M16 6h3.5a1 1 0 0 1 1 1c0 3-1.6 5-4.5 5M12 15v3M8.5 21h7M10 18h4" />,
+  puzzle: <path d="M9.5 3.5a2 2 0 0 1 4 1.5v2h2.5a2 2 0 0 1 1.5 3.3l1.7 1.7a2 2 0 0 1-1.5 3.4H15v2a2 2 0 0 1-3.4 1.4l-1.7-1.6-1.7 1.6A2 2 0 0 1 4.7 19v-2H3.2a2 2 0 0 1-1.4-3.4l1.6-1.7-1.6-1.7A2 2 0 0 1 3.2 7h2.5v-2a2 2 0 0 1 3.8-.5Z" />,
+  palette: (
     <>
-      <path d="m4 8 4 3 4-6 4 6 4-3-1.5 10h-13Z" strokeLinejoin="round" />
-      <path d="M6.5 21h11" />
+      <path d="M12 3a9 9 0 0 0-7.5 13.5c.9 1.4 2.4 1 3.4.2 1.6-1.3.3-3.6 2.3-3.6 4.6 0 8.3-1 8.3-5C18.5 4.5 15.6 3 12 3Z" />
+      <circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none" />
+      <circle cx="10.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="13.5" cy="10" r="1" fill="currentColor" stroke="none" />
     </>
   ),
-  gem: (
+  wrench: <path d="M14.5 6.5a5 5 0 0 0-6.4 6.4L3 18a2.3 2.3 0 0 0 3 3l5-5A5 5 0 0 0 17.4 7.6l-2.9 2.9-2.4-2.4Z" />,
+  pin: <path d="M12 2.5c-3.6 0-6 2.4-6 6 0 5.3 6 12.5 6 12.5s6-7.2 6-12.5c0-3.6-2.4-6-6-6Z M12 10.5h.01" />,
+  megaphone: <path d="M3 10.5 14 5v14L3 13.5ZM14 6.5a4.5 4.5 0 0 1 3 5M7.5 13.5l1.5 7h3l-1.5-7M10 10.5h11" />,
+  umbrella: <path d="M12 2.5a9.5 9.5 0 0 1 9.5 9.5h-19A9.5 9.5 0 0 1 12 2.5Z M12 12v6.5a2.5 2.5 0 0 0 5 0M12 2.5V1" />,
+  gamepad: (
     <>
-      <path d="M7 4h10l4 5-9 11L3 9Z" strokeLinejoin="round" />
-      <path d="M3 9h18M9 4l-2 5 5 11 5-11-2-5" />
+      <rect x="2.5" y="8" width="19" height="9" rx="4.5" />
+      <path d="M8 11v3M6.5 12.5h3M15.5 11h.01M18 13h.01" />
     </>
   ),
-  bookmark: <path d="M6 3.5h12V21l-6-4-6 4Z" strokeLinejoin="round" />,
-  smile: (
+  clapper: (
     <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M8.5 14c.8 1.4 2 2.2 3.5 2.2s2.7-.8 3.5-2.2" />
-      <circle cx="9" cy="9.8" r="0.8" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="9.8" r="0.8" fill="currentColor" stroke="none" />
+      <path d="M3.5 8.5 18.5 4l1.4 4.7-15 4.5Z" />
+      <path d="M4.5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h12A1.5 1.5 0 0 0 19.5 19v-6.5" />
     </>
   ),
-  zap: <path d="M13 2.5 4.5 14H11l-1 7.5L19.5 10H13Z" strokeLinejoin="round" />,
-  moonStar: (
+  link: (
     <>
-      <path d="M20 14.2A8.2 8.2 0 1 1 9.8 3.5 6.5 6.5 0 0 0 20 14.2Z" strokeLinejoin="round" />
-      <path d="m17.5 3.5.6 1.8 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6Z" />
+      <path d="M10.5 13.5a4.2 4.2 0 0 0 6 0l3-3a4.2 4.2 0 0 0-6-6l-1.4 1.4" />
+      <path d="M13.5 10.5a4.2 4.2 0 0 0-6 0l-3 3a4.2 4.2 0 0 0 6 6l1.4-1.4" />
     </>
   ),
-  sprout: (
+  mail: (
     <>
-      <path d="M12 21v-8" />
-      <path d="M12 13C8 13 5 10.5 5 6c4.5 0 7 2.5 7 7Z" />
-      <path d="M12 11c4 0 7-2.5 7-6.5-4.5 0-7 2.5-7 6.5Z" />
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <path d="m4.5 7.5 7.5 5.6 7.5-5.6" />
     </>
   ),
-  gallery: (
+  phone: <path d="M5.5 4h3.6l1.7 4.4-2.3 1.4a11.5 11.5 0 0 0 5.7 5.7l1.4-2.3L20 14.9v3.6a1.9 1.9 0 0 1-1.9 1.9A15.5 15.5 0 0 1 3.6 5.9 1.9 1.9 0 0 1 5.5 4Z" />,
+  tags: (
     <>
-      <rect x="3.5" y="4.5" width="7" height="7" rx="1" />
-      <rect x="13.5" y="4.5" width="7" height="7" rx="1" />
-      <rect x="3.5" y="14.5" width="7" height="5" rx="1" />
-      <rect x="13.5" y="14.5" width="7" height="5" rx="1" />
+      <path d="M20.2 12.3 12.7 19.8a1.9 1.9 0 0 1-2.7 0l-6-6V4h9.8l6.4 6.4a1.9 1.9 0 0 1 0 1.9Z" />
+      <circle cx="8.3" cy="8.3" r="1.3" fill="currentColor" stroke="none" />
     </>
   ),
-  toc: <path d="M4 6h3M9.5 6H20M4 12h3M9.5 12H20M4 18h3M9.5 18H16" />,
-  subpage: (
+  duplicate: (
     <>
-      <path d="M7 3.5h7L18.5 8v12a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 20V5A1.5 1.5 0 0 1 7 3.5Z" />
-      <path d="M13.5 3.5V8H18.5M9 14h6M12 11v6" />
-    </>
-  ),
-  pageLink: (
-    <>
-      <path d="M9.5 14.5 14.5 9.5" />
-      <path d="M8 16.5 6.5 18a3.5 3.5 0 0 1-5-5L5 9.5a3.5 3.5 0 0 1 5 0" />
-      <path d="M16 7.5 17.5 6a3.5 3.5 0 0 1 5 5L19 14.5a3.5 3.5 0 0 1-5 0" />
-    </>
-  ),
-  copy: (
-    <>
-      <rect x="8.5" y="8.5" width="11" height="11" rx="2" />
-      <path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3" />
-    </>
-  ),
-  move: (
-    <>
-      <path d="M3.5 7A2 2 0 0 1 5.5 5h4l2 2.5h7A2 2 0 0 1 20.5 9.5v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
-      <path d="M9 14h6M13 11l3 3-3 3" />
-    </>
-  ),
-  backlink: (
-    <>
-      <path d="M9 8H6a4 4 0 0 0 0 8h3M15 16h3a4 4 0 0 0 0-8h-3" />
-      <path d="M8 12h8" />
-    </>
-  ),
-  cover: (
-    <>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="m3 17 5-5 4 4 3-3 6 6" />
-      <circle cx="8" cy="9" r="1.4" />
-    </>
-  ),
-  chartLine: (
-    <>
-      <path d="M4 4v16h16" />
-      <path d="m7 15 4-4 3 2.5 5-6.5" />
-    </>
-  ),
-  chartDonut: (
-    <>
-      <circle cx="12" cy="12" r="8.5" />
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 3.5v4.5M20.5 12H16" />
-    </>
-  ),
-  more: (
-    <>
-      <circle cx="5.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
-      <circle cx="18.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15.5V5.5a2 2 0 0 1 2-2h10" />
     </>
   ),
 };
+
+/** Iconos elegibles para el encabezado de página y la barra lateral (catálogo tipo Notion, buscable). */
+export const PAGE_ICONS: readonly IconName[] = [
+  'doc', 'heading', 'quote', 'code', 'image', 'database', 'table', 'board', 'calendar', 'chart', 'clock',
+  'star', 'heart', 'sun', 'moon', 'compass', 'keyboard', 'leaf', 'briefcase', 'book', 'folder', 'globe',
+  'cloud', 'flame', 'zap', 'music', 'video', 'camera', 'coffee', 'gift', 'bell', 'lock', 'key',
+  'home', 'building', 'flag', 'mapPin', 'plane', 'car', 'tree', 'flower', 'lightbulb', 'rocket', 'crown',
+  'gem', 'apple', 'bookmark', 'inbox', 'archive', 'tag', 'wallet', 'target', 'trophy', 'puzzle', 'palette',
+  'wrench', 'pin', 'megaphone', 'umbrella', 'gamepad', 'clapper',
+  'phone', 'mail', 'link', 'hash', 'tags', 'checkSquare', 'toggle', 'callout', 'bulletList', 'numberedList',
+  'file', 'info', 'pen',
+];
 
 export function Icon({
   name,

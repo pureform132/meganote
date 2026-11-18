@@ -18,7 +18,7 @@ body:
     attributes:
       label: Pasos para reproducirlo
       placeholder: |
-        1. Abrir Takenotes
+        1. Abrir MEGAnote
         2. Crear una página
         3. ...
     validations:
@@ -28,7 +28,7 @@ body:
     attributes:
       label: Plataforma
       options:
-        - Windows (Takenotes.exe)
+        - Windows (MEGAnote.exe)
         - Navegador (demo o build web)
         - Desde el código (npm run dev)
     validations:

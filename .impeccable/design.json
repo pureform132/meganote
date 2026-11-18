@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-11-17T00:00:00.000Z",
-  "title": "Design System: Takenotes",
+  "title": "Design System: MEGAnote",
   "extensions": {
     "colorMeta": {
       "paper": {
@@ -88,7 +88,7 @@
       "name": "Sidebar Tree Row (active)",
       "kind": "nav",
       "description": "Notebook index row; active = paper fill + authored terracotta ink-stroke tab at the leading edge.",
-      "html": "<button class=\"ds-treerow is-active\"><svg class=\"ds-treerow-tab\" viewBox=\"0 0 7 17\" width=\"7\" height=\"17\" aria-hidden=\"true\"><path d=\"M5.6 0.9 C4.4 5.2 4.4 11.6 5.6 16.1 L2.5 15.3 C1.4 10.6 1.4 6.3 2.5 1.7 Z\" fill=\"currentColor\"/></svg><span class=\"ds-treerow-title\">Welcome to Takenotes</span></button>",
+      "html": "<button class=\"ds-treerow is-active\"><svg class=\"ds-treerow-tab\" viewBox=\"0 0 7 17\" width=\"7\" height=\"17\" aria-hidden=\"true\"><path d=\"M5.6 0.9 C4.4 5.2 4.4 11.6 5.6 16.1 L2.5 15.3 C1.4 10.6 1.4 6.3 2.5 1.7 Z\" fill=\"currentColor\"/></svg><span class=\"ds-treerow-title\">Welcome to MEGAnote</span></button>",
       "css": ".ds-treerow { position: relative; display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; background: none; border: none; padding: 3px 6px 3px 2px; border-radius: 6px; color: #5d584e; font: 400 13.5px/1.9 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer; } .ds-treerow:hover { background: #f0ede3; color: #2E2A26; } .ds-treerow.is-active { background: #FDFCF8; color: #2E2A26; font-weight: 600; } .ds-treerow-tab { position: absolute; left: -5px; top: 50%; width: 7px; height: 17px; transform: translateY(-50%) rotate(-3deg); color: #C65D3B; pointer-events: none; }"
     },
     {
@@ -101,7 +101,7 @@
   ],
   "narrative": {
     "northStar": "The Paper Desk",
-    "overview": "Takenotes is a well-kept paper desk that happens to be software: warm paper ground, ink for writing, terracotta for action, sage for state. Chrome recedes; the notes lead. Everything is ink, paper, and hairlines — the only cast shadows belong to buttons.",
+    "overview": "MEGAnote is a well-kept paper desk that happens to be software: warm paper ground, ink for writing, terracotta for action, sage for state. Chrome recedes; the notes lead. Everything is ink, paper, and hairlines — the only cast shadows belong to buttons.",
     "keyCharacteristics": [
       "Four hues only: warm paper, soft ink, terracotta, sage — every derivative via color-mix",
       "Serif display (Newsreader) for titles; Hanken Grotesk for working UI",

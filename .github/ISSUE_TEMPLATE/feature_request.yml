@@ -13,7 +13,7 @@ body:
     id: propuesta
     attributes:
       label: Propuesta
-      description: Cómo imaginas la función en Takenotes.
+      description: Cómo imaginas la función en MEGAnote.
     validations:
       required: true
   - type: textarea

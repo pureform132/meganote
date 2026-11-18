@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://pureform132.github.io/takenotes/sitemap.xml
+Sitemap: https://pureform132.github.io/meganote/sitemap.xml

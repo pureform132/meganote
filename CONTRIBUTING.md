@@ -1,6 +1,6 @@
-# Contribuir a Takenotes
+# Contribuir a MEGAnote
 
-Gracias por querer mejorar Takenotes. Es un proyecto pequeño y las contribuciones se revisan con cariño: errores, accesibilidad, traducción, rendimiento, nuevas vistas de base de datos o mejoras del importador de Notion.
+Gracias por querer mejorar MEGAnote. Es un proyecto pequeño y las contribuciones se revisan con cariño: errores, accesibilidad, traducción, rendimiento, nuevas vistas de base de datos o mejoras del importador de Notion.
 
 ## Antes de empezar
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Icon, type IconName } from '../lib/icons';
 import { htmlToText, escapeHtml } from '../lib/html';
+import { cellText } from '../lib/dbcell';
 import type { Page } from '../lib/types';
 
 interface Hit {
@@ -43,17 +44,9 @@ function rank(p: Page, q: string): Hit | null {
   // filas de bases de datos
   if (p.kind === 'database' && p.db) {
     for (const r of p.db.rows) {
-      const text = Object.entries(r.cells)
-        .map(([cid, v]) => {
-          if (v === null || v === undefined || v === '') return '';
-          const col = p.db!.columns.find((c) => c.id === cid);
-          if (!col) return String(v);
-          if (col.type === 'select') return col.options?.find((o) => o.id === v)?.label ?? String(v);
-          if (col.type === 'checkbox') return v ? 'sí' : '';
-          return String(v);
-        })
-        .join(' ')
-        .toLowerCase();
+      const text = p.db.columns
+        .map((c) => cellText(r, c).toLowerCase())
+        .join(' ');
       const i = text.indexOf(q);
       if (i >= 0) {
         score = Math.max(score, 650 - i);

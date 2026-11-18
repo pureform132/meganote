@@ -1,62 +1,76 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Icon, type IconName } from '../lib/icons';
-import { getPageDrag, hasPageDrag } from '../lib/pageDrag';
-import { newId, type ChartKind, type DBColumn, type DBRow, type DBView, type Page, type PropertyType } from '../lib/types';
+import {
+  ALL_TAG_COLORS, newId,
+  type CellValue, type DBColumn, type DBRow, type DBState, type DBView, type NumberFormat,
+  type Page, type PropertyType, type SelectOption, type TagColor,
+} from '../lib/types';
+import {
+  cellText, convertColumn, formatNumberCell, nextColor,
+  NUMBER_FORMATS, NUMBER_PRECISIONS,
+} from '../lib/dbcell';
 
-const TONE_BY_INDEX = ['ink', 'terra', 'sage'] as const;
+const TYPES: { type: PropertyType; label: string; icon: IconName }[] = [
+  { type: 'text', label: 'Texto', icon: 'text' },
+  { type: 'number', label: 'Número', icon: 'hash' },
+  { type: 'select', label: 'Selección', icon: 'dot' },
+  { type: 'multi_select', label: 'Selección múltiple', icon: 'tags' },
+  { type: 'date', label: 'Fecha', icon: 'calendar' },
+  { type: 'checkbox', label: 'Casilla', icon: 'checkSquare' },
+  { type: 'url', label: 'URL', icon: 'link' },
+  { type: 'email', label: 'Correo', icon: 'mail' },
+  { type: 'phone', label: 'Teléfono', icon: 'phone' },
+];
 
 function cloneDB<T>(x: T): T {
   return JSON.parse(JSON.stringify(x)) as T;
 }
 
-function cellText(row: DBRow, col: DBColumn): string {
-  const v = row.cells[col.id];
-  if (v == null) return '';
-  if (col.type === 'select') return col.options?.find((o) => o.id === v)?.label ?? String(v);
-  if (col.type === 'checkbox') return v ? 'sí' : 'no';
-  return String(v);
-}
-
 export function DatabaseView({ page }: { page: Page }) {
-  const { updateDB, updatePage, toggleFavorite, trashPage, movePage, byId } = useWorkspace();
+  const { updateDB, updatePage, toggleFavorite, trashPage, byId, createPage, setActivePageId } = useWorkspace();
   const db = page.db!;
-  const [dragOver, setDragOver] = useState(false);
-  const [dropNotice, setDropNotice] = useState<string | null>(null);
   const [addPropOpen, setAddPropOpen] = useState(false);
   const [openCell, setOpenCell] = useState<string | null>(null); // `${rowId}:${colId}`
-  const [renamingCol, setRenamingCol] = useState<string | null>(null);
+  const [menuCol, setMenuCol] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [paletteFor, setPaletteFor] = useState<string | null>(null); // opción abriendo su paleta
+  const [coverRow, setCoverRow] = useState<string | null>(null); // fila con el editor de portada abierto
+  const [coverUrl, setCoverUrl] = useState('');
   const [monthOffset, setMonthOffset] = useState(0);
   const [newOption, setNewOption] = useState('');
   const addPropRef = useRef<HTMLDivElement>(null);
   const cellPopRef = useRef<HTMLDivElement>(null);
+  const colMenuRef = useRef<HTMLDivElement>(null);
+  const coverPopRef = useRef<HTMLDivElement>(null);
   const dragRow = useRef<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!dropNotice) return;
-    const timer = window.setTimeout(() => setDropNotice(null), 3600);
-    return () => window.clearTimeout(timer);
-  }, [dropNotice]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       if (addPropOpen && !addPropRef.current?.contains(t)) setAddPropOpen(false);
       if (openCell && !cellPopRef.current?.contains(t) && !t.closest('.pill')) setOpenCell(null);
+      if (menuCol && !colMenuRef.current?.contains(t) && !t.closest('.thname')) {
+        setMenuCol(null);
+        setPaletteFor(null);
+      }
+      if (coverRow && !coverPopRef.current?.contains(t) && !t.closest('.gcard__coverbtn')) {
+        setCoverRow(null);
+      }
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [addPropOpen, openCell]);
+  }, [addPropOpen, openCell, menuCol]);
 
-  const mutate = (fn: (draft: typeof db) => void) =>
+  const mutate = (fn: (draft: DBState) => void, tag?: string) =>
     updateDB(page.id, (d) => {
       const draft = cloneDB(d);
       fn(draft);
       return draft;
-    });
+    }, tag ?? null);
 
-  const setView = (view: DBView) => mutate((d) => { d.view = view; });
+  const setView = (view: DBView) => mutate((d) => { d.view = view; }, `view:${view}`);
 
   // filtro + orden
   const filteredRows = useMemo(() => {
@@ -70,48 +84,50 @@ export function DatabaseView({ page }: { page: Page }) {
       rows = [...rows].sort((a, b) => {
         const av = a.cells[col?.id ?? ''];
         const bv = b.cells[col?.id ?? ''];
-        const an = av == null ? '' : String(av);
-        const bn = bv == null ? '' : String(bv);
         if (col?.type === 'number') return (Number(av ?? -Infinity) - Number(bv ?? -Infinity)) * dir;
         if (col?.type === 'checkbox') return (Number(!!av) - Number(!!bv)) * dir;
+        const an = Array.isArray(av) ? av.join(',') : av == null ? '' : String(av);
+        const bn = Array.isArray(bv) ? bv.join(',') : bv == null ? '' : String(bv);
         return an.localeCompare(bn, 'es') * dir;
       });
     }
     return rows;
   }, [db]);
 
-  const addRow = (preset?: Record<string, string | number | boolean | null>) => {
+  const addRow = (preset?: Record<string, CellValue>) => {
     const id = newId();
     mutate((d) => {
       const cells: DBRow['cells'] = {};
-      for (const c of d.columns) {
-        cells[c.id] = c.type === 'checkbox' ? false : c.type === 'number' ? null : '';
-      }
+      for (const c of d.columns) cells[c.id] = c.type === 'checkbox' ? false : null;
       Object.assign(cells, preset ?? {});
       d.rows.push({ id, cells });
-    });
+    }, `row:${id}`);
     return id;
   };
 
-  const setCell = (rowId: string, colId: string, value: DBRow['cells'][string]) =>
+  const setCell = (rowId: string, colId: string, value: CellValue) =>
     mutate((d) => {
       const row = d.rows.find((r) => r.id === rowId);
       if (row) row.cells[colId] = value;
-    });
+    }, `cell:${rowId}:${colId}`);
 
-  const deleteRow = (rowId: string) => mutate((d) => { d.rows = d.rows.filter((r) => r.id !== rowId); });
+  const deleteRow = (rowId: string) => mutate((d) => { d.rows = d.rows.filter((r) => r.id !== rowId); }, `rowdel:${rowId}`);
 
   const addColumn = (type: PropertyType) => {
+    const labels: Record<PropertyType, string> = {
+      text: 'Propiedad', number: 'Número', select: 'Selección', multi_select: 'Selección múlt.',
+      date: 'Fecha', checkbox: 'Casilla', url: 'URL', email: 'Correo', phone: 'Teléfono',
+    };
     mutate((d) => {
-      const base = { id: newId(), name: type === 'text' ? 'Propiedad' : type === 'number' ? 'Número' : type === 'select' ? 'Selección' : type === 'date' ? 'Fecha' : 'Casilla', type } as DBColumn;
-      if (type === 'select') {
+      const base: DBColumn = { id: newId(), name: labels[type], type };
+      if (type === 'select' || type === 'multi_select') {
         base.options = [
-          { id: newId(), label: 'Opción A', tone: 'ink' },
-          { id: newId(), label: 'Opción B', tone: 'terra' },
+          { id: newId(), label: 'Opción A', color: nextColor(0) },
+          { id: newId(), label: 'Opción B', color: nextColor(1) },
         ];
       }
       d.columns.push(base);
-    });
+    }, `coladd:${type}`);
     setAddPropOpen(false);
   };
 
@@ -123,23 +139,101 @@ export function DatabaseView({ page }: { page: Page }) {
       if (d.sortColumnId === colId) d.sortColumnId = null;
       if (d.groupByColumnId === colId) d.groupByColumnId = d.columns.find((c) => c.type === 'select')?.id ?? null;
       if (d.calendarColumnId === colId) d.calendarColumnId = d.columns.find((c) => c.type === 'date')?.id ?? null;
-    });
+    }, `coldel:${colId}`);
 
   const renameColumn = (colId: string, name: string) =>
     mutate((d) => {
       const col = d.columns.find((c) => c.id === colId);
-      if (col) col.name = name.trim() || col.name;
-    });
+      if (col && name.trim()) col.name = name.trim();
+    }, `colren:${colId}`);
+
+  const changeColumnType = (colId: string, to: PropertyType) =>
+    mutate((d) => { convertColumn(d, colId, to); }, `coltype:${colId}:${to}`);
+
+  const duplicateColumn = (colId: string) =>
+    mutate((d) => {
+      const i = d.columns.findIndex((c) => c.id === colId);
+      if (i < 0) return;
+      const src = d.columns[i];
+      const optMap = new Map<string, string>();
+      const col: DBColumn = {
+        ...src,
+        id: newId(),
+        name: `${src.name} copia`,
+        options: src.options?.map((o) => {
+          const nid = newId();
+          optMap.set(o.id, nid);
+          return { ...o, id: nid };
+        }),
+      };
+      d.columns.splice(i + 1, 0, col);
+      for (const r of d.rows) {
+        const v = r.cells[colId];
+        r.cells[col.id] = Array.isArray(v) ? v.map((x) => optMap.get(x) ?? x) : v;
+      }
+    }, `coldup:${colId}`);
+
+  const updateSelectOption = (colId: string, optId: string, patch: Partial<Omit<SelectOption, 'id'>>) =>
+    mutate((d) => {
+      const col = d.columns.find((c) => c.id === colId);
+      const o = col?.options?.find((x) => x.id === optId);
+      if (o) Object.assign(o, patch);
+    }, `opt:${colId}:${optId}`);
+
+  const removeSelectOption = (colId: string, optId: string) =>
+    mutate((d) => {
+      const col = d.columns.find((c) => c.id === colId);
+      if (!col) return;
+      col.options = (col.options ?? []).filter((o) => o.id !== optId);
+      for (const r of d.rows) {
+        const v = r.cells[colId];
+        if (Array.isArray(v)) {
+          const next = v.filter((x) => x !== optId);
+          r.cells[colId] = next.length ? next : null;
+        } else if (v === optId) {
+          r.cells[colId] = null;
+        }
+      }
+    }, `optdel:${colId}:${optId}`);
 
   const addSelectOption = (colId: string, label: string) => {
     const id = newId();
     mutate((d) => {
       const col = d.columns.find((c) => c.id === colId);
-      if (!col || col.type !== 'select') return;
-      col.options = [...(col.options ?? []), { id, label: label.trim(), tone: TONE_BY_INDEX[(col.options?.length ?? 0) % 3] }];
-    });
+      if (!col) return;
+      col.options = [...(col.options ?? []), { id, label: label.trim(), color: nextColor(col.options?.length ?? 0) }];
+    }, `optadd:${colId}`);
     return id;
   };
+
+  const setNumberFormat = (colId: string, format: NumberFormat) =>
+    mutate((d) => {
+      const col = d.columns.find((c) => c.id === colId);
+      if (col) col.numberFormat = format;
+    }, `numfmt:${colId}:${format}`);
+
+  const setRowCover = (rowId: string, cover: string | null) =>
+    mutate((d) => {
+      const row = d.rows.find((r) => r.id === rowId);
+      if (!row) return;
+      if (cover) row.cover = cover;
+      else delete row.cover;
+    }, `rowcover:${rowId}`);
+
+  const COVER_LIMIT = 1_500_000;
+  const applyCoverFile = (rowId: string, file: File | undefined) => {
+    if (!file) return;
+    if (file.size > COVER_LIMIT) return;
+    const reader = new FileReader();
+    reader.onload = () => { setRowCover(rowId, String(reader.result)); setCoverRow(null); };
+    reader.readAsDataURL(file);
+  };
+
+  const setNumberPrecision = (colId: string, precision: number | null) =>
+    mutate((d) => {
+      const col = d.columns.find((c) => c.id === colId);
+      if (col) col.numberPrecision = precision;
+    }, `numprec:${colId}:${precision}`);
 
   const groupCol = db.columns.find((c) => c.id === db.groupByColumnId && c.type === 'select')
     ?? db.columns.find((c) => c.type === 'select') ?? null;
@@ -147,33 +241,10 @@ export function DatabaseView({ page }: { page: Page }) {
     ?? db.columns.find((c) => c.type === 'date') ?? null;
 
   const firstColId = db.columns[0]?.id;
+  const menuColumn = db.columns.find((c) => c.id === menuCol) ?? null;
 
   return (
-    <div
-      className={`dbwrap${dragOver ? ' is-page-drop' : ''}`}
-      onDragOver={(e) => {
-        if (!hasPageDrag(e)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        setDragOver(true);
-      }}
-      onDragLeave={(e) => {
-        const next = e.relatedTarget as Node | null;
-        if (!next || !e.currentTarget.contains(next)) setDragOver(false);
-      }}
-      onDrop={(e) => {
-        const draggedId = getPageDrag(e);
-        if (!draggedId) return;
-        e.preventDefault();
-        setDragOver(false);
-        if (draggedId === page.id) return;
-        if (!movePage(draggedId, page.id)) {
-          setDropNotice('No puedes mover una página dentro de sí misma ni de sus subpáginas.');
-          return;
-        }
-        setDropNotice(`«${byId.get(draggedId)?.title || 'Sin título'}» ahora vive dentro de esta base de datos.`);
-      }}
-    >
+    <div className="dbwrap">
       {/* encabezado editable */}
       <div className="titlerow" style={{ marginBottom: 14 }}>
         <div className="titleicon" aria-hidden="true" style={{ width: 44, height: 44 }}>
@@ -201,9 +272,11 @@ export function DatabaseView({ page }: { page: Page }) {
           {([
             { v: 'table' as DBView, label: 'Tabla', icon: 'table' as IconName },
             { v: 'board' as DBView, label: 'Tablero', icon: 'board' as IconName },
+            { v: 'gallery' as DBView, label: 'Galería', icon: 'image' as IconName },
+            { v: 'list' as DBView, label: 'Lista', icon: 'numberedList' as IconName },
+            { v: 'timeline' as DBView, label: 'Línea de tiempo', icon: 'clock' as IconName },
             { v: 'calendar' as DBView, label: 'Calendario', icon: 'calendar' as IconName },
             { v: 'chart' as DBView, label: 'Gráfico', icon: 'chart' as IconName },
-            { v: 'gallery' as DBView, label: 'Galería', icon: 'gallery' as IconName },
           ]).map(({ v, label, icon }) => (
             <button key={v} role="tab" aria-selected={db.view === v}
               className={`viewtab${db.view === v ? ' is-active' : ''}`} onClick={() => setView(v)}>
@@ -218,7 +291,7 @@ export function DatabaseView({ page }: { page: Page }) {
               className="dbfilter"
               placeholder="Filtrar filas…"
               value={db.filter}
-              onChange={(e) => mutate((d) => { d.filter = e.target.value; })}
+              onChange={(e) => mutate((d) => { d.filter = e.target.value; }, 'filter')}
               aria-label="Filtrar filas"
             />
           </div>
@@ -226,7 +299,7 @@ export function DatabaseView({ page }: { page: Page }) {
             <select
               className="dbselect"
               value={groupCol?.id ?? ''}
-              onChange={(e) => mutate((d) => { d.groupByColumnId = e.target.value; })}
+              onChange={(e) => mutate((d) => { d.groupByColumnId = e.target.value; }, `group:${e.target.value}`)}
               aria-label="Agrupar tablero por columna"
             >
               {db.columns.filter((c) => c.type === 'select').map((c) => (
@@ -240,13 +313,7 @@ export function DatabaseView({ page }: { page: Page }) {
             </button>
             {addPropOpen && (
               <div className="addprop__menu" role="menu">
-                {([
-                  ['text', 'Texto', 'text'],
-                  ['number', 'Número', 'sort'],
-                  ['select', 'Selección', 'toggle'],
-                  ['date', 'Fecha', 'calendar'],
-                  ['checkbox', 'Casilla', 'checkSquare'],
-                ] as [PropertyType, string, IconName][]).map(([type, label, icon]) => (
+                {TYPES.map(({ type, label, icon }) => (
                   <button key={type} role="menuitem" onClick={() => addColumn(type)}>
                     <Icon name={icon} size={15} /> {label}
                   </button>
@@ -264,45 +331,58 @@ export function DatabaseView({ page }: { page: Page }) {
             <thead>
               <tr>
                 {db.columns.map((col) => (
-                  <th key={col.id}>
-                    {renamingCol === col.id ? (
-                      <input
-                        className="cellinput"
-                        autoFocus
-                        defaultValue={col.name}
-                        onBlur={(e) => { renameColumn(col.id, e.target.value); setRenamingCol(null); }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                          if (e.key === 'Escape') setRenamingCol(null);
-                        }}
-                        aria-label="Renombrar columna"
+                  <th key={col.id} style={{ position: 'relative' }}>
+                    <button
+                      className={`thname${db.sortColumnId === col.id ? ' is-sorted' : ''}`}
+                      onClick={(e) => {
+                        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                        setMenuPos({ x: r.left, y: r.bottom + 4 });
+                        setMenuCol((v) => (v === col.id ? null : col.id));
+                        setPaletteFor(null);
+                      }}
+                      title="Editar propiedad (nombre, tipo, formato, opciones)"
+                      aria-haspopup="menu"
+                      aria-expanded={menuCol === col.id}
+                    >
+                      <span className="thname__type" aria-hidden="true">
+                        <Icon name={TYPES.find((t) => t.type === col.type)?.icon ?? 'text'} size={12} />
+                      </span>
+                      {col.name}
+                      {db.sortColumnId === col.id && (
+                        <Icon name={db.sortDir === 'asc' ? 'chevronUp' : 'chevronDown'} size={11} />
+                      )}
+                    </button>
+                    {db.columns.length > 1 && (
+                      <button className="coldel" title="Eliminar columna" aria-label={`Eliminar columna ${col.name}`} onClick={() => deleteColumn(col.id)}>
+                        <Icon name="x" size={12} />
+                      </button>
+                    )}
+                    {menuCol === col.id && menuColumn && (
+                      <ColumnMenu
+                        db={db}
+                        col={menuColumn}
+                        menuRef={colMenuRef}
+                        pos={menuPos}
+                        paletteFor={paletteFor}
+                        setPaletteFor={setPaletteFor}
+                        onClose={() => { setMenuCol(null); setPaletteFor(null); }}
+                        onRename={(name) => renameColumn(col.id, name)}
+                        onChangeType={(t) => changeColumnType(col.id, t)}
+                        onDelete={() => { deleteColumn(col.id); setMenuCol(null); }}
+                        onDuplicate={() => { duplicateColumn(col.id); setMenuCol(null); }}
+                        onSort={(dir) => mutate((d) => {
+                          if (dir === null) { d.sortColumnId = null; return; }
+                          if (d.sortColumnId === col.id && d.sortDir === dir) { d.sortColumnId = null; return; }
+                          d.sortColumnId = col.id;
+                          d.sortDir = dir;
+                        }, `sort:${col.id}:${dir ?? 'off'}`)}
+                        sortActive={db.sortColumnId === col.id ? db.sortDir : null}
+                        onSetFormat={(f) => setNumberFormat(col.id, f)}
+                        onSetPrecision={(p) => setNumberPrecision(col.id, p)}
+                        onUpdateOption={(oid, patch) => updateSelectOption(col.id, oid, patch)}
+                        onRemoveOption={(oid) => removeSelectOption(col.id, oid)}
+                        onAddOption={(label) => addSelectOption(col.id, label)}
                       />
-                    ) : (
-                      <>
-                        <button
-                          className="thsort"
-                          onClick={() => mutate((d) => {
-                            if (d.sortColumnId === col.id) {
-                              d.sortDir = d.sortDir === 'asc' ? 'desc' : 'asc';
-                            } else {
-                              d.sortColumnId = col.id;
-                              d.sortDir = 'asc';
-                            }
-                          })}
-                          onDoubleClick={() => setRenamingCol(col.id)}
-                          title="Ordenar · doble clic para renombrar"
-                        >
-                          {col.name}
-                          {db.sortColumnId === col.id && (
-                            <Icon name={db.sortDir === 'asc' ? 'chevronUp' : 'chevronDown'} size={11} />
-                          )}
-                        </button>
-                        {db.columns.length > 1 && (
-                          <button className="coldel" title="Eliminar columna" aria-label={`Eliminar columna ${col.name}`} onClick={() => deleteColumn(col.id)}>
-                            <Icon name="x" size={12} />
-                          </button>
-                        )}
-                      </>
                     )}
                   </th>
                 ))}
@@ -323,33 +403,63 @@ export function DatabaseView({ page }: { page: Page }) {
                       const opt = col.options?.find((o) => o.id === row.cells[col.id]);
                       return (
                         <td key={col.id} style={{ position: 'relative' }}>
-                          <button className="pill" data-tone={opt?.tone ?? 'ink'} onClick={() => setOpenCell(openCell === cellKey ? null : cellKey)}>
+                          <button className="pill" data-color={opt?.color ?? 'default'} onClick={() => setOpenCell(openCell === cellKey ? null : cellKey)}>
                             <i />{opt?.label ?? 'Elegir…'}
                           </button>
                           {openCell === cellKey && (
-                            <div className="cellopts" ref={cellPopRef} role="listbox" aria-label={`Elegir ${col.name}`}>
-                              {col.options?.map((o) => (
-                                <button key={o.id} role="option" onClick={() => { setCell(row.id, col.id, o.id); setOpenCell(null); }}>
-                                  <span className="pill" data-tone={o.tone} style={{ pointerEvents: 'none' }}><i />{o.label}</span>
-                                </button>
-                              ))}
-                              <div className="newopt">
-                                <input
-                                  value={newOption}
-                                  placeholder="Nueva opción…"
-                                  onChange={(e) => setNewOption(e.target.value)}
-                                  aria-label="Nueva opción de selección"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && newOption.trim()) {
-                                      const id = addSelectOption(col.id, newOption);
-                                      setCell(row.id, col.id, id);
-                                      setNewOption('');
-                                      setOpenCell(null);
-                                    }
-                                  }}
-                                />
-                              </div>
-                            </div>
+                            <SelectCellPopover
+                              popRef={cellPopRef}
+                              col={col}
+                              selected={row.cells[col.id] == null ? [] : [String(row.cells[col.id])]}
+                              onToggle={(oid) => { setCell(row.id, col.id, oid); setOpenCell(null); }}
+                              onClear={() => { setCell(row.id, col.id, null); setOpenCell(null); }}
+                              newOption={newOption}
+                              setNewOption={setNewOption}
+                              onCreate={(label) => {
+                                const id = addSelectOption(col.id, label);
+                                setCell(row.id, col.id, id);
+                                setNewOption('');
+                                setOpenCell(null);
+                              }}
+                            />
+                          )}
+                        </td>
+                      );
+                    }
+                    if (col.type === 'multi_select') {
+                      const ids = Array.isArray(row.cells[col.id]) ? (row.cells[col.id] as string[]) : [];
+                      const selected = col.options?.filter((o) => ids.includes(o.id)) ?? [];
+                      return (
+                        <td key={col.id} style={{ position: 'relative' }}>
+                          <button
+                            className="pillstack"
+                            data-empty={selected.length === 0 ? 'true' : undefined}
+                            onClick={() => setOpenCell(openCell === cellKey ? null : cellKey)}
+                          >
+                            {selected.length === 0
+                              ? <>Elegir…</>
+                              : selected.map((o) => <span key={o.id} className="pill" data-color={o.color}><i />{o.label}</span>)}
+                          </button>
+                          {openCell === cellKey && (
+                            <SelectCellPopover
+                              popRef={cellPopRef}
+                              col={col}
+                              selected={ids}
+                              multi
+                              onToggle={(oid) => {
+                                const next = ids.includes(oid) ? ids.filter((x) => x !== oid) : [...ids, oid];
+                                setCell(row.id, col.id, next.length ? next : null);
+                              }}
+                              onClear={() => { setCell(row.id, col.id, null); setOpenCell(null); }}
+                              newOption={newOption}
+                              setNewOption={setNewOption}
+                              onCreate={(label) => {
+                                const id = addSelectOption(col.id, label);
+                                const next = [...ids, id];
+                                setCell(row.id, col.id, next);
+                                setNewOption('');
+                              }}
+                            />
                           )}
                         </td>
                       );
@@ -380,15 +490,40 @@ export function DatabaseView({ page }: { page: Page }) {
                         </td>
                       );
                     }
+                    if (col.type === 'number') {
+                      const raw = row.cells[col.id];
+                      return (
+                        <td key={col.id}>
+                          <NumberCell
+                            value={typeof raw === 'number' && Number.isFinite(raw) ? raw : null}
+                            col={col}
+                            onCommit={(n) => setCell(row.id, col.id, n)}
+                            ariaLabel={col.name}
+                          />
+                        </td>
+                      );
+                    }
+                    if (col.type === 'url' || col.type === 'email' || col.type === 'phone') {
+                      const raw = row.cells[col.id];
+                      const text = raw == null || Array.isArray(raw) ? '' : String(raw);
+                      return (
+                        <td key={col.id}>
+                          <LinkCell
+                            kind={col.type}
+                            text={text}
+                            onCommit={(s) => setCell(row.id, col.id, s === '' ? null : s)}
+                            ariaLabel={col.name}
+                          />
+                        </td>
+                      );
+                    }
                     return (
                       <td key={col.id}>
                         <input
                           className="cellinput"
-                          type={col.type === 'number' ? 'number' : 'text'}
+                          type="text"
                           value={String(row.cells[col.id] ?? '')}
-                          onChange={(e) =>
-                            setCell(row.id, col.id, col.type === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value)
-                          }
+                          onChange={(e) => setCell(row.id, col.id, e.target.value)}
                           aria-label={col.name}
                         />
                       </td>
@@ -412,7 +547,7 @@ export function DatabaseView({ page }: { page: Page }) {
       {/* VISTA TABLERO */}
       {db.view === 'board' && groupCol && (
         <div className="board" role="list" aria-label="Tablero agrupado por estado">
-          {[...(groupCol.options ?? []), { id: '__none__', label: 'Sin estado', tone: 'ink' as const }].map((opt) => {
+          {[...(groupCol.options ?? []), { id: '__none__', label: 'Sin estado', color: 'default' as TagColor }].map((opt) => {
             const rows = filteredRows.filter((r) =>
               opt.id === '__none__' ? !r.cells[groupCol.id] : r.cells[groupCol.id] === opt.id,
             );
@@ -432,7 +567,7 @@ export function DatabaseView({ page }: { page: Page }) {
                 }}
               >
                 <div className="bcol__head">
-                  <span className="pill" data-tone={opt.tone}><i />{opt.label}</span>
+                  <span className="pill" data-color={opt.color}><i />{opt.label}</span>
                   <span className="bcol__count">{rows.length}</span>
                 </div>
                 {rows.map((row) => (
@@ -448,7 +583,7 @@ export function DatabaseView({ page }: { page: Page }) {
                     <span className="bcard__meta">
                       {db.columns.filter((c) => c.type === 'select' && c.id !== groupCol.id).slice(0, 1).map((c) => {
                         const o = c.options?.find((x) => x.id === row.cells[c.id]);
-                        return o ? <span key={c.id} className="pill" data-tone={o.tone}><i />{o.label}</span> : null;
+                        return o ? <span key={c.id} className="pill" data-color={o.color}><i />{o.label}</span> : null;
                       })}
                       {dateCol && row.cells[dateCol.id] && (
                         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{String(row.cells[dateCol.id])}</span>
@@ -473,6 +608,149 @@ export function DatabaseView({ page }: { page: Page }) {
         <p style={{ color: 'var(--ink-55)', padding: '30px 8px' }}>Añade una propiedad de Selección para agrupar este tablero en columnas.</p>
       )}
 
+      {/* VISTA GALERÍA */}
+      {db.view === 'gallery' && (
+        <div className="gallery" role="list" aria-label="Galería de la base de datos">
+          {filteredRows.map((row) => {
+            const titleCol = db.columns[0];
+            const selectCol = db.columns.find((c) => c.type === 'select' || c.type === 'multi_select');
+            const coverOpt = selectCol?.options?.find((o) => o.id === row.cells[selectCol.id]);
+            const props = db.columns.slice(1, 4);
+            return (
+              <article key={row.id} className="gcard" role="listitem">
+                {row.cover ? (
+                  <img className="gcard__cover-img" src={row.cover} alt="" loading="lazy" />
+                ) : (
+                  <div className="gcard__cover" data-color={coverOpt?.color ?? 'default'} />
+                )}
+                <button
+                  className="gcard__coverbtn"
+                  title={row.cover ? 'Cambiar portada' : 'Añadir portada'}
+                  aria-label={row.cover ? 'Cambiar portada' : 'Añadir portada'}
+                  aria-expanded={coverRow === row.id}
+                  onClick={() => { setCoverRow((v) => (v === row.id ? null : row.id)); setCoverUrl(row.cover ?? ''); }}
+                >
+                  <Icon name="image" size={12} />
+                </button>
+                {coverRow === row.id && (
+                  <div className="coverpop" ref={coverPopRef} role="menu" aria-label="Editar portada">
+                    <input
+                      className="coverpop__input"
+                      autoFocus
+                      value={coverUrl}
+                      placeholder="Pega una URL de imagen…"
+                      onChange={(e) => setCoverUrl(e.target.value)}
+                      aria-label="URL de la portada"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && coverUrl.trim()) { setRowCover(row.id, coverUrl.trim()); setCoverRow(null); }
+                        if (e.key === 'Escape') setCoverRow(null);
+                      }}
+                    />
+                    <div className="coverpop__row">
+                      <button className="filebtn" onClick={() => { if (coverUrl.trim()) { setRowCover(row.id, coverUrl.trim()); setCoverRow(null); } }}>Aplicar</button>
+                      <label className="filebtn">
+                        Subir
+                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => applyCoverFile(row.id, e.target.files?.[0])} />
+                      </label>
+                      {row.cover && (
+                        <button className="filebtn filebtn--danger" onClick={() => { setRowCover(row.id, null); setCoverRow(null); }}>Quitar</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="gcard__body">
+                  <span className="gcard__title">{titleCol ? cellText(row, titleCol) || 'Sin título' : 'Sin título'}</span>
+                  <div className="gcard__props">
+                    {props.map((c) => {
+                      const v = row.cells[c.id];
+                      if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) return null;
+                      if (c.type === 'select' || c.type === 'multi_select') {
+                        const ids = Array.isArray(v) ? v : [String(v)];
+                        const opts = (c.options ?? []).filter((o) => ids.includes(o.id));
+                        return opts.map((o) => <span key={c.id + o.id} className="pill" data-color={o.color}><i />{o.label}</span>);
+                      }
+                      if (c.type === 'checkbox') return v ? <span key={c.id} className="gcard__prop"><Icon name="check" size={11} /> {c.name}</span> : null;
+                      return <span key={c.id} className="gcard__prop">{cellText(row, c)}</span>;
+                    })}
+                  </div>
+                </div>
+                <button className="rowdel gcard__del" title="Eliminar fila" aria-label="Eliminar fila" onClick={() => deleteRow(row.id)}>
+                  <Icon name="x" size={12} />
+                </button>
+              </article>
+            );
+          })}
+          <button className="gcard gcard--new" onClick={() => addRow()}>
+            <Icon name="plus" size={14} /> Nueva fila
+          </button>
+        </div>
+      )}
+
+      {/* VISTA LISTA */}
+      {db.view === 'list' && (
+        <div className="dblist">
+          {(() => {
+            const group = db.columns.find((c) => c.id === db.groupByColumnId && c.type === 'select')
+              ?? db.columns.find((c) => c.type === 'select');
+            const titleCol = db.columns[0];
+            const buckets: { key: string; label: string; color?: TagColor; rows: typeof filteredRows }[] = [];
+            if (group) {
+              for (const o of group.options ?? []) {
+                buckets.push({ key: o.id, label: o.label, color: o.color, rows: filteredRows.filter((r) => r.cells[group.id] === o.id) });
+              }
+              const none = filteredRows.filter((r) => !r.cells[group.id]);
+              if (none.length) buckets.push({ key: '__none__', label: 'Sin estado', color: 'default', rows: none });
+            } else {
+              buckets.push({ key: '__all__', label: '', rows: filteredRows });
+            }
+            return buckets.map((b) => (
+              <section key={b.key} className="dbgroup">
+                {b.label && (
+                  <h4 className="dbgroup__head">
+                    <span className="pill" data-color={b.color ?? 'default'}><i />{b.label}</span>
+                    <span className="dbgroup__count">{b.rows.length}</span>
+                  </h4>
+                )}
+                {b.rows.map((row) => (
+                  <div key={row.id} className="lrow">
+                    <span className="lrow__icon"><Icon name="doc" size={14} /></span>
+                    <span className="lrow__title">{titleCol ? cellText(row, titleCol) || 'Sin título' : 'Sin título'}</span>
+                    <span className="lrow__props">
+                      {db.columns.slice(1, 4).map((c) => {
+                        const v = row.cells[c.id];
+                        if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) return null;
+                        if (c.type === 'select' || c.type === 'multi_select') {
+                          const ids = Array.isArray(v) ? v : [String(v)];
+                          const opts = (c.options ?? []).filter((o) => ids.includes(o.id));
+                          return opts.map((o) => <span key={c.id + o.id} className="pill" data-color={o.color}><i />{o.label}</span>);
+                        }
+                        if (c.type === 'checkbox') return v ? <span key={c.id} className="lrow__prop"><Icon name="check" size={11} />{c.name}</span> : null;
+                        return <span key={c.id} className="lrow__prop">{cellText(row, c)}</span>;
+                      })}
+                    </span>
+                    <button className="rowdel" title="Eliminar fila" aria-label="Eliminar fila" onClick={() => deleteRow(row.id)}>
+                      <Icon name="x" size={12} />
+                    </button>
+                  </div>
+                ))}
+                <button className="addrow" onClick={() => addRow(group && b.key !== '__none__' && b.key !== '__all__' ? { [group.id]: b.key } : {})}>
+                  <Icon name="plus" size={12} /> Nueva fila
+                </button>
+              </section>
+            ));
+          })()}
+        </div>
+      )}
+
+      {/* VISTA LÍNEA DE TIEMPO */}
+      {db.view === 'timeline' && (
+        dateCol ? (
+          <TimelineView db={db} dateCol={dateCol} rows={filteredRows} onDelete={deleteRow} onAdd={() => addRow()} />
+        ) : (
+          <p style={{ color: 'var(--ink-55)', padding: '30px 8px' }}>Añade una propiedad de Fecha para colocar las filas en la línea de tiempo.</p>
+        )
+      )}
+
       {/* VISTA CALENDARIO */}
       {db.view === 'calendar' && (
         <CalendarView
@@ -485,445 +763,553 @@ export function DatabaseView({ page }: { page: Page }) {
       )}
 
       {/* VISTA GRÁFICO */}
-      {db.view === 'chart' && <ChartView db={db} mutate={mutate} />}
-
-      {/* VISTA GALERÍA */}
-      {db.view === 'gallery' && (
-        <GalleryView
-          db={db}
-          firstColId={firstColId ?? db.columns[0]?.id ?? ''}
-          onAdd={() => addRow()}
-          onDelete={deleteRow}
-          setCell={setCell}
-        />
-      )}
+      {db.view === 'chart' && <ChartView db={db} />}
 
       <p style={{ marginTop: 14, fontSize: 11, color: 'var(--ink-38)' }}>
         {db.rows.length} {db.rows.length === 1 ? 'fila' : 'filas'} · guardado localmente{db.filter.trim() ? ' · filtrado' : ''}
       </p>
 
-      {dropNotice && (
-        <div className="dropnotice" role="status" aria-live="polite">
-          <Icon name="subpage" size={14} /> {dropNotice}
-        </div>
+      {(() => {
+        const children = [...byId.values()].filter((p) => p.parentId === page.id && !p.trashed);
+        return (
+          <div className="subpages" aria-label="Subpáginas">
+            <div className="subpages__head">
+              <span className="subpages__label">Subpáginas</span>
+              <button className="subpages__add" onClick={() => createPage(page.id, 'page')} title="Crear una subpágina aquí">
+                <Icon name="plus" size={12} /> Nueva subpágina
+              </button>
+            </div>
+            {children.length > 0 ? (
+              <div className="subpages__grid">
+                {children.map((p) => (
+                  <button key={p.id} className="subpage" onClick={() => setActivePageId(p.id)} title={`Abrir ${p.title || 'Sin título'}`}>
+                    <span className="subpage__icon"><Icon name={(p.icon || 'doc') as IconName} size={15} /></span>
+                    <span className="subpage__title">{p.title || 'Sin título'}</span>
+                    <span className="subpage__kind">{p.kind === 'database' ? 'Base de datos' : 'Página'}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="subpages__empty">Aún no hay subpáginas — crea una y aparecerá aquí y en el árbol.</p>
+            )}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ── celda de número con formato (display) + edición ─────────────────────── */
+
+function NumberCell({ value, col, onCommit, ariaLabel }: {
+  value: number | null;
+  col: DBColumn;
+  onCommit: (n: number | null) => void;
+  ariaLabel: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const commit = () => {
+    const s = draft.trim().replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+    const n = s === '' ? null : Number(s);
+    setEditing(false);
+    onCommit(n != null && Number.isFinite(n) ? n : null);
+  };
+  if (editing) {
+    return (
+      <input
+        className="cellinput"
+        type="text"
+        inputMode="decimal"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false); }
+        }}
+        aria-label={ariaLabel}
+      />
+    );
+  }
+  return (
+    <button
+      className="numcell"
+      onClick={() => { setDraft(value == null ? '' : String(value).replace('.', ',')); setEditing(true); }}
+      title="Editar número"
+      aria-label={ariaLabel}
+    >
+      {value == null ? '' : formatNumberCell(value, col)}
+    </button>
+  );
+}
+
+/* ── celda de enlace (url / email / teléfono) ────────────────────────────── */
+
+function LinkCell({ kind, text, onCommit, ariaLabel }: {
+  kind: 'url' | 'email' | 'phone';
+  text: string;
+  onCommit: (s: string) => void;
+  ariaLabel: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const href =
+    kind === 'url' ? (/^https?:\/\//i.test(text) ? text : `https://${text}`)
+    : kind === 'email' ? `mailto:${text}`
+    : `tel:${text.replace(/[^+\d]/g, '')}`;
+
+  if (editing) {
+    return (
+      <input
+        className="cellinput"
+        type="text"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => { setEditing(false); onCommit(draft.trim()); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') { setDraft(text); setEditing(false); }
+        }}
+        aria-label={ariaLabel}
+      />
+    );
+  }
+  if (!text) {
+    return (
+      <button className="cellghost" onClick={() => { setDraft(''); setEditing(true); }} aria-label={ariaLabel}>
+        <Icon name={kind === 'url' ? 'link' : kind === 'email' ? 'mail' : 'phone'} size={12} /> Vacío
+      </button>
+    );
+  }
+  return (
+    <span className="celllink">
+      <a href={href} target="_blank" rel="noreferrer noopener" title="Abrir enlace">
+        <Icon name={kind === 'url' ? 'link' : kind === 'email' ? 'mail' : 'phone'} size={12} />
+        {text}
+      </a>
+      <button className="celledit" title="Editar" aria-label={`Editar ${ariaLabel}`} onClick={() => { setDraft(text); setEditing(true); }}>
+        <Icon name="pen" size={11} />
+      </button>
+    </span>
+  );
+}
+
+/* ── popover de opciones de selección / multi-selección ──────────────────── */
+
+function SelectCellPopover({
+  popRef, col, selected, multi = false, onToggle, onClear, newOption, setNewOption, onCreate,
+}: {
+  popRef: React.RefObject<HTMLDivElement | null>;
+  col: DBColumn;
+  selected: string[];
+  multi?: boolean;
+  onToggle: (optionId: string) => void;
+  onClear: () => void;
+  newOption: string;
+  setNewOption: (v: string) => void;
+  onCreate: (label: string) => void;
+}) {
+  return (
+    <div className="cellopts" ref={popRef} role="listbox" aria-label={`Elegir ${col.name}`} data-multi={multi || undefined}>
+      {(col.options ?? []).map((o) => (
+        <button
+          key={o.id}
+          role="option"
+          aria-selected={selected.includes(o.id)}
+          onClick={() => onToggle(o.id)}
+        >
+          <span className="pill" data-color={o.color} style={{ pointerEvents: 'none' }}><i />{o.label}</span>
+          {multi && <span className="cellopts__mark">{selected.includes(o.id) ? <Icon name="check" size={11} /> : ''}</span>}
+        </button>
+      ))}
+      <div className="newopt">
+        <input
+          value={newOption}
+          placeholder="Nueva opción…"
+          onChange={(e) => setNewOption(e.target.value)}
+          aria-label="Nueva opción de selección"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && newOption.trim()) onCreate(newOption.trim());
+          }}
+        />
+      </div>
+      {selected.length > 0 && (
+        <button className="cellopts__clear" onClick={onClear}>
+          <Icon name="x" size={11} /> Quitar selección
+        </button>
       )}
     </div>
   );
 }
 
-type ChartPoint = { key: string; label: string; value: number; tone: 'sage' | 'terra' | 'ink' };
+/* ── menú de columna (estilo Notion) ─────────────────────────────────────── */
 
-const CHART_KINDS: { id: ChartKind; label: string; icon: IconName }[] = [
-  { id: 'bar', label: 'Barras', icon: 'chart' },
-  { id: 'horizontal', label: 'Horizontal', icon: 'sort' },
-  { id: 'line', label: 'Líneas', icon: 'chartLine' },
-  { id: 'donut', label: 'Donut', icon: 'chartDonut' },
-];
-
-function toneColor(tone: ChartPoint['tone']): string {
-  if (tone === 'sage') return 'var(--sage)';
-  if (tone === 'terra') return 'var(--terra)';
-  return 'var(--ink-70, var(--ink))';
-}
-
-function ChartView({
-  db,
-  mutate,
+function ColumnMenu({
+  db, col, menuRef, pos, paletteFor, setPaletteFor, onClose,
+  onRename, onChangeType, onDelete, onDuplicate, onSort, sortActive,
+  onSetFormat, onSetPrecision, onUpdateOption, onRemoveOption, onAddOption,
 }: {
-  db: NonNullable<Page['db']>;
-  mutate: (fn: (draft: NonNullable<Page['db']>) => void) => void;
+  db: DBState;
+  col: DBColumn;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  pos: { x: number; y: number };
+  paletteFor: string | null;
+  setPaletteFor: (v: string | null) => void;
+  onClose: () => void;
+  onRename: (name: string) => void;
+  onChangeType: (t: PropertyType) => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+  onSort: (dir: 'asc' | 'desc' | null) => void;
+  sortActive: 'asc' | 'desc' | null;
+  onSetFormat: (f: NumberFormat) => void;
+  onSetPrecision: (p: number | null) => void;
+  onUpdateOption: (optionId: string, patch: Partial<Omit<SelectOption, 'id'>>) => void;
+  onRemoveOption: (optionId: string) => void;
+  onAddOption: (label: string) => void;
 }) {
-  const candidates = useMemo(
-    () => db.columns.filter((c) => c.type === 'select' || c.type === 'date' || c.type === 'checkbox' || c.type === 'text'),
-    [db.columns],
-  );
-  const numeric = useMemo(() => db.columns.filter((c) => c.type === 'number'), [db.columns]);
-  const axis =
-    candidates.find((c) => c.id === db.chartColumnId)
-    ?? candidates.find((c) => c.type === 'select')
-    ?? candidates.find((c) => c.type === 'date')
-    ?? candidates.find((c) => c.type === 'checkbox')
-    ?? candidates[0]
-    ?? null;
-  const metricCol = numeric.find((c) => c.id === db.chartMetricColumnId) ?? null;
-  const metricOp = db.chartMetricOp ?? 'sum';
-  const kind = db.chartKind ?? 'bar';
+  const [draftName, setDraftName] = useState(col.name);
+  const [newOpt, setNewOpt] = useState('');
+  const commitName = () => onRename(draftName);
 
-  const aggregate = (rows: DBRow[]): number => {
-    if (!metricCol) return rows.length;
-    const sum = rows.reduce((acc, row) => {
-      const raw = row.cells[metricCol.id];
-      return acc + (typeof raw === 'number' ? raw : Number(raw ?? 0) || 0);
-    }, 0);
-    if (metricOp === 'avg' && rows.length > 0) return sum / rows.length;
-    return sum;
-  };
-
-  const points = useMemo<ChartPoint[]>(() => {
-    if (!axis) return [];
-    if (axis.type === 'select') {
-      const out: ChartPoint[] = (axis.options ?? []).map((o) => ({
-        key: o.id,
-        label: o.label,
-        value: aggregate(db.rows.filter((r) => r.cells[axis.id] === o.id)),
-        tone: o.tone,
-      }));
-      const none = db.rows.filter((r) => !r.cells[axis.id]);
-      if (none.length > 0) out.push({ key: '__none__', label: 'Sin valor', value: aggregate(none), tone: 'ink' });
-      return out;
-    }
-    if (axis.type === 'checkbox') {
-      return [
-        { key: 'yes', label: 'Hecho', value: aggregate(db.rows.filter((r) => !!r.cells[axis.id])), tone: 'sage' },
-        { key: 'no', label: 'Pendiente', value: aggregate(db.rows.filter((r) => !r.cells[axis.id])), tone: 'ink' },
-      ];
-    }
-    if (axis.type === 'date') {
-      const now = new Date();
-      const months: { key: string; label: string }[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        months.push({
-          key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-          label: d.toLocaleString('es', { month: 'short' }),
-        });
-      }
-      return months.map((m) => ({
-        key: m.key,
-        label: m.label,
-        value: aggregate(db.rows.filter((r) => typeof r.cells[axis.id] === 'string' && String(r.cells[axis.id]).startsWith(m.key))),
-        tone: 'terra',
-      }));
-    }
-    const groups = new Map<string, DBRow[]>();
-    for (const row of db.rows) {
-      const raw = row.cells[axis.id];
-      const label = String(raw ?? '').trim() || 'Sin valor';
-      if (!groups.has(label)) groups.set(label, []);
-      groups.get(label)!.push(row);
-    }
-    const ordered = [...groups.entries()]
-      .map(([label, rows], index) => ({
-        key: label,
-        label,
-        rows,
-        value: aggregate(rows),
-        tone: (['ink', 'terra', 'sage'] as const)[index % 3],
-      }))
-      .sort((a, b) => b.value - a.value);
-    const top: ChartPoint[] = ordered.slice(0, 8).map(({ key, label, value, tone }) => ({ key, label, value, tone }));
-    if (ordered.length > 8) {
-      top.push({
-        key: '__other__',
-        label: 'Otros',
-        value: aggregate(ordered.slice(8).flatMap((x) => x.rows)),
-        tone: 'ink',
-      });
-    }
-    return top;
-  }, [axis, db.rows, metricCol, metricOp]);
-
-  if (candidates.length === 0) {
-    return (
-      <p style={{ color: 'var(--ink-55)', padding: '30px 8px' }}>
-        Añade una propiedad de <b>Selección</b>, <b>Fecha</b>, <b>Casilla</b> o <b>Texto</b> para graficar los datos.
-      </p>
-    );
-  }
-
-  const total = points.reduce((acc, p) => acc + p.value, 0);
-  const max = Math.max(1, ...points.map((p) => p.value));
-  const avg = points.length > 0 ? total / points.length : 0;
-  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
-  const valueLabel = metricCol
-    ? `${metricOp === 'avg' ? 'Media' : 'Suma'} de ${metricCol.name}`
-    : 'Recuento de filas';
-
-  const W = 820;
-  const H = 300;
-  const PT = 28;
-  const PB = 48;
-  const barPL = 14;
-  const barPR = 14;
-  const innerH = H - PT - PB;
-
-  const setMetric = (value: string) => {
-    mutate((d) => {
-      if (value === 'count') {
-        d.chartMetricColumnId = null;
-      } else {
-        const [op, id] = value.split(':');
-        d.chartMetricOp = op as 'sum' | 'avg';
-        d.chartMetricColumnId = id;
-      }
-    });
+  const rowValues = db.rows.map((r) => r.cells[col.id]);
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    left: Math.min(pos.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 312),
+    top: Math.min(pos.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 380),
   };
 
   return (
-    <div className="chartwrap">
-      <div className="charttools">
-        <div className="charttool">
-          <span className="charttools__label">Agrupar por</span>
-          <select
-            className="dbselect"
-            value={axis?.id ?? ''}
-            onChange={(e) => mutate((d) => { d.chartColumnId = e.target.value; })}
-            aria-label="Columna para agrupar el gráfico"
-          >
-            {candidates.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="charttool">
-          <span className="charttools__label">Valor</span>
-          <select
-            className="dbselect"
-            value={metricCol ? `${metricOp}:${metricCol.id}` : 'count'}
-            onChange={(e) => setMetric(e.target.value)}
-            aria-label="Qué valor mostrar en el gráfico"
-          >
-            <option value="count">Recuento de filas</option>
-            {numeric.map((c) => (
-              <option key={`sum-${c.id}`} value={`sum:${c.id}`}>Suma de {c.name}</option>
-            ))}
-            {numeric.map((c) => (
-              <option key={`avg-${c.id}`} value={`avg:${c.id}`}>Media de {c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="chartkinds" role="tablist" aria-label="Tipo de gráfico">
-          {CHART_KINDS.map((k) => (
-            <button
-              key={k.id}
-              role="tab"
-              aria-selected={kind === k.id}
-              className={kind === k.id ? 'is-active' : ''}
-              onClick={() => mutate((d) => { d.chartKind = k.id; })}
-            >
-              <Icon name={k.icon} size={14} /> {k.label}
+    <div className="colmenu" ref={menuRef} style={style} role="menu" aria-label={`Editar propiedad ${col.name}`}>
+      <input
+        className="colmenu__name"
+        value={draftName}
+        onChange={(e) => setDraftName(e.target.value)}
+        onBlur={commitName}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') { setDraftName(col.name); onClose(); }
+        }}
+        placeholder="Nombre de la propiedad"
+        aria-label="Nombre de la propiedad"
+      />
+
+      <div className="colmenu__section">
+        <p className="colmenu__label">Tipo</p>
+        <div className="colmenu__types">
+          {TYPES.map(({ type, label, icon }) => (
+            <button key={type} role="menuitem" className={`coltype${col.type === type ? ' is-active' : ''}`} onClick={() => onChangeType(type)}>
+              <Icon name={icon} size={14} /> {label}
+              {col.type === type && <Icon name="check" size={12} />}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="chartstats">
-        <div><b>{fmt(total)}</b><span>Total</span></div>
-        <div><b>{fmt(max)}</b><span>Máximo</span></div>
-        <div><b>{fmt(avg)}</b><span>Media por grupo</span></div>
-        <div><b>{points.length}</b><span>Grupos</span></div>
-      </div>
-
-      {points.length === 0 ? (
-        <p className="chartempty">Aún no hay datos que dibujar.</p>
-      ) : kind === 'donut' ? (
-        <div className="donutwrap">
-          <svg className="donutchart" viewBox="0 0 280 280" role="img" aria-label={`Gráfico donut de ${axis?.name ?? ''}`}>
-            <circle cx="140" cy="140" r="92" fill="none" stroke="var(--line-soft)" strokeWidth="30" />
-            {(() => {
-              let offset = 0;
-              return points.map((p) => {
-                const pct = total > 0 ? p.value / total : 0;
-                const dash = pct * 100;
-                const el = (
-                  <circle
-                    key={p.key}
-                    cx="140"
-                    cy="140"
-                    r="92"
-                    fill="none"
-                    stroke={toneColor(p.tone)}
-                    strokeWidth="30"
-                    pathLength={100}
-                    strokeDasharray={`${dash} ${100 - dash}`}
-                    strokeDashoffset={-offset}
-                    transform="rotate(-90 140 140)"
-                  >
-                    <title>{`${p.label}: ${fmt(p.value)}`}</title>
-                  </circle>
-                );
-                offset += dash;
-                return el;
-              });
-            })()}
-            <text x="140" y="134" textAnchor="middle" className="donuttotal">{fmt(total)}</text>
-            <text x="140" y="156" textAnchor="middle" className="donutcap">{metricCol ? metricCol.name : 'filas'}</text>
-          </svg>
-          <ul className="donutlegend">
-            {points.map((p) => (
-              <li key={p.key}>
-                <i style={{ background: toneColor(p.tone) }} />
-                <span className="donutlegend__name">{p.label}</span>
-                <span className="donutlegend__value">{fmt(p.value)}</span>
-                <span className="donutlegend__pct">{total > 0 ? Math.round((p.value / total) * 100) : 0}%</span>
-              </li>
+      {col.type === 'number' && (
+        <div className="colmenu__section">
+          <p className="colmenu__label">Formato de número</p>
+          <div className="numgrid">
+            {NUMBER_FORMATS.map((f) => (
+              <button key={f.id} role="menuitem" className={`numfmt${(col.numberFormat ?? 'plain') === f.id ? ' is-active' : ''}`} onClick={() => onSetFormat(f.id)}>
+                {f.label}
+              </button>
             ))}
-          </ul>
+          </div>
+          <p className="colmenu__label" style={{ marginTop: 8 }}>Decimales</p>
+          <div className="precgrid">
+            {NUMBER_PRECISIONS.map((p) => (
+              <button key={p.label} role="menuitem" className={`prec${(col.numberPrecision ?? null) === p.value ? ' is-active' : ''}`} onClick={() => onSetPrecision(p.value)}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {rowValues.some((v) => typeof v === 'number' && Number.isFinite(v)) && (
+            <p className="colmenu__hint">
+              Ej.: {formatNumberCell(rowValues.find((v) => typeof v === 'number') as number, col)}
+            </p>
+          )}
         </div>
-      ) : kind === 'line' ? (
-        <svg className="chartsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico de líneas de ${axis?.name ?? ''}`}>
-          {[0.25, 0.5, 0.75].map((f, i) => {
-            const y = PT + innerH * (1 - f);
-            return <line key={i} x1={barPL} x2={W - barPR} y1={y} y2={y} stroke="var(--line-soft)" strokeDasharray="2 5" />;
-          })}
-          <line x1={barPL} x2={W - barPR} y1={PT + innerH} y2={PT + innerH} stroke="var(--line)" />
-          {(() => {
-            const slot = (W - barPL - barPR) / Math.max(1, points.length);
-            const coords = points.map((p, i) => ({
-              x: barPL + slot * i + slot / 2,
-              y: PT + innerH - (p.value / max) * innerH,
-              p,
-            }));
-            const path = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x} ${c.y}`).join(' ');
-            const area = `${path} L ${coords[coords.length - 1].x} ${PT + innerH} L ${coords[0].x} ${PT + innerH} Z`;
-            return (
-              <>
-                <path d={area} fill="color-mix(in oklab, var(--terra) 14%, transparent)" stroke="none" />
-                <path d={path} fill="none" stroke="var(--terra)" strokeWidth="2.2" strokeLinejoin="round" />
-                {coords.map((c) => (
-                  <g key={c.p.key}>
-                    <title>{`${c.p.label}: ${fmt(c.p.value)}`}</title>
-                    <circle cx={c.x} cy={c.y} r="4.2" fill="var(--paper)" stroke="var(--terra)" strokeWidth="2" />
-                    {c.p.value > 0 && <text x={c.x} y={c.y - 11} textAnchor="middle" className="chartval">{fmt(c.p.value)}</text>}
-                    <text x={c.x} y={PT + innerH + 19} textAnchor="middle" className="chartlab">{c.p.label.length > 14 ? c.p.label.slice(0, 13) + '…' : c.p.label}</text>
-                  </g>
-                ))}
-              </>
-            );
-          })()}
-        </svg>
-      ) : kind === 'horizontal' ? (
-        <svg className="chartsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico horizontal de ${axis?.name ?? ''}`}>
-          {[0.25, 0.5, 0.75].map((f, i) => {
-            const x = 170 + (W - 230) * f;
-            return <line key={i} x1={x} x2={x} y1={PT} y2={PT + innerH} stroke="var(--line-soft)" strokeDasharray="2 5" />;
-          })}
-          {(() => {
-            const labelW = 158;
-            const barW = W - labelW - 60;
-            const rowH = innerH / Math.max(1, points.length);
-            return points.map((p, i) => {
-              const y = PT + i * rowH + rowH * 0.2;
-              const h = Math.max(8, Math.min(26, rowH * 0.58));
-              const w = (p.value / max) * barW;
-              return (
-                <g key={p.key}>
-                  <title>{`${p.label}: ${fmt(p.value)}`}</title>
-                  <text x={labelW - 10} y={y + h * 0.7} textAnchor="end" className="chartlab">{p.label.length > 20 ? p.label.slice(0, 19) + '…' : p.label}</text>
-                  <rect x={labelW} y={y} width={Math.max(2, w)} height={h} rx={4} fill={toneColor(p.tone)} opacity={p.value > 0 ? 1 : 0.25} />
-                  <text x={labelW + w + 8} y={y + h * 0.7} className="chartval">{fmt(p.value)}</text>
-                </g>
-              );
-            });
-          })()}
-        </svg>
-      ) : (
-        <svg className="chartsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico de barras de ${axis?.name ?? ''}`}>
-          {[0.25, 0.5, 0.75].map((f, i) => {
-            const y = PT + innerH * (1 - f);
-            return <line key={i} x1={barPL} x2={W - barPR} y1={y} y2={y} stroke="var(--line-soft)" strokeDasharray="2 5" />;
-          })}
-          <line x1={barPL} x2={W - barPR} y1={PT + innerH} y2={PT + innerH} stroke="var(--line)" />
-          {(() => {
-            const innerW = W - barPL - barPR;
-            const slot = innerW / Math.max(1, points.length);
-            const barW = Math.min(78, slot * 0.62);
-            return points.map((p, i) => {
-              const h = (p.value / max) * innerH;
-              const x = barPL + i * slot + (slot - barW) / 2;
-              const y = PT + innerH - h;
-              return (
-                <g key={p.key} className="chartbar">
-                  <title>{`${p.label}: ${fmt(p.value)}`}</title>
-                  <rect x={x} y={y} width={barW} height={Math.max(h, p.value > 0 ? 3 : 2)} rx={5} fill={toneColor(p.tone)} opacity={p.value > 0 ? 1 : 0.25} />
-                  {p.value > 0 && <text x={x + barW / 2} y={y - 8} textAnchor="middle" className="chartval">{fmt(p.value)}</text>}
-                  <text x={x + barW / 2} y={PT + innerH + 20} textAnchor="middle" className="chartlab">{p.label.length > 14 ? p.label.slice(0, 13) + '…' : p.label}</text>
-                </g>
-              );
-            });
-          })()}
-        </svg>
       )}
 
-      <p className="chartfoot">
-        {points.length} {points.length === 1 ? 'grupo' : 'grupos'} · eje: {axis?.name} · {valueLabel} · guardado localmente
-      </p>
-    </div>
-  );
-}
-
-function GalleryView({
-  db,
-  firstColId,
-  onAdd,
-  onDelete,
-  setCell,
-}: {
-  db: NonNullable<Page['db']>;
-  firstColId: string;
-  onAdd: () => void;
-  onDelete: (rowId: string) => void;
-  setCell: (rowId: string, colId: string, value: DBRow['cells'][string]) => void;
-}) {
-  const first = db.columns.find((c) => c.id === firstColId);
-  const selectCols = db.columns.filter((c) => c.type === 'select');
-  const showProps = db.columns.filter((c) => c.id !== firstColId).slice(0, 4);
-
-  return (
-    <div className="gallerywrap">
-      <div className="gallerygrid">
-        {db.rows.map((row) => {
-          const tone = selectCols
-            .map((c) => c.options?.find((o) => o.id === row.cells[c.id]))
-            .find(Boolean)?.tone;
-          return (
-            <article key={row.id} className="gcard">
-              <div className={`gcard__band${tone ? ` tone-${tone}` : ''}`}>
-                <Icon name="doc" size={18} />
-              </div>
-              <div className="gcard__body">
-                <input
-                  className="gcard__title"
-                  value={String(row.cells[firstColId] ?? '')}
-                  placeholder={first?.name ?? 'Sin título'}
-                  aria-label={first?.name ?? 'Título de la tarjeta'}
-                  onChange={(e) => setCell(row.id, firstColId, e.target.value)}
+      {(col.type === 'select' || col.type === 'multi_select') && (
+        <div className="colmenu__section">
+          <p className="colmenu__label">Opciones</p>
+          <div className="colmenu__opts">
+            {(col.options ?? []).map((o) => (
+              <div key={o.id} className="optrow" style={{ position: 'relative' }}>
+                <button
+                  className="optswatch"
+                  data-color={o.color}
+                  title="Cambiar color"
+                  aria-label={`Color de ${o.label}`}
+                  onClick={() => setPaletteFor(paletteFor === o.id ? null : o.id)}
                 />
-                <div className="gcard__props">
-                  {showProps.map((col) => {
-                    const value = row.cells[col.id];
-                    if (col.type === 'select') {
-                      const opt = col.options?.find((o) => o.id === value);
-                      return opt ? (
-                        <span key={col.id} className="pill" data-tone={opt.tone}><i />{opt.label}</span>
-                      ) : null;
-                    }
-                    if (col.type === 'checkbox') {
-                      return (
-                        <span key={col.id} className={`gcard__bool${value ? ' is-on' : ''}`}>
-                          <Icon name={value ? 'check' : 'x'} size={10} /> {col.name}
-                        </span>
-                      );
-                    }
-                    if (value === null || value === undefined || value === '') return null;
-                    return <span key={col.id} className="gcard__prop">{col.name}: {String(value)}</span>;
-                  })}
-                </div>
+                <input
+                  className="optrow__label"
+                  defaultValue={o.label}
+                  onBlur={(e) => { if (e.target.value.trim() && e.target.value !== o.label) onUpdateOption(o.id, { label: e.target.value.trim() }); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                  aria-label={`Etiqueta de ${o.label}`}
+                />
+                <button className="optrow__del" title="Eliminar opción" aria-label={`Eliminar opción ${o.label}`} onClick={() => onRemoveOption(o.id)}>
+                  <Icon name="x" size={11} />
+                </button>
+                {paletteFor === o.id && (
+                  <div className="palette" role="menu" aria-label="Elegir color">
+                    {ALL_TAG_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        role="menuitem"
+                        className={`pal__swatch${o.color === c ? ' is-active' : ''}`}
+                        data-color={c}
+                        title={c}
+                        aria-label={`Color ${c}`}
+                        onClick={() => { onUpdateOption(o.id, { color: c }); setPaletteFor(null); }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-              <button className="rowdel" title="Eliminar tarjeta" aria-label="Eliminar tarjeta" onClick={() => onDelete(row.id)}>
-                <Icon name="x" size={13} />
-              </button>
-            </article>
-          );
-        })}
-        <button className="gcard gcard--add" onClick={onAdd}>
-          <Icon name="plus" size={16} />
-          <span>Nueva tarjeta</span>
+            ))}
+          </div>
+          <div className="newopt">
+            <input
+              value={newOpt}
+              placeholder="Añadir opción…"
+              onChange={(e) => setNewOpt(e.target.value)}
+              aria-label="Añadir opción"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newOpt.trim()) { onAddOption(newOpt.trim()); setNewOpt(''); }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="colmenu__footer">
+        <button role="menuitem" className={sortActive === 'asc' ? 'is-active' : ''} onClick={() => onSort('asc')}>
+          <Icon name="chevronUp" size={12} /> Ordenar ascendente
         </button>
+        <button role="menuitem" className={sortActive === 'desc' ? 'is-active' : ''} onClick={() => onSort('desc')}>
+          <Icon name="chevronDown" size={12} /> Ordenar descendente
+        </button>
+        {sortActive && (
+          <button role="menuitem" onClick={() => onSort(null)}>
+            <Icon name="x" size={12} /> Quitar orden
+          </button>
+        )}
+        <button role="menuitem" onClick={onDuplicate}><Icon name="duplicate" size={12} /> Duplicar propiedad</button>
+        <button role="menuitem" className="is-danger" onClick={onDelete}><Icon name="trash" size={12} /> Eliminar propiedad</button>
       </div>
     </div>
   );
 }
+
+/* ── línea de tiempo (vista tipo Notion) ─────────────────────────────────── */
+
+function TimelineView({
+  db, dateCol, rows, onDelete, onAdd,
+}: {
+  db: DBState;
+  dateCol: DBColumn;
+  rows: DBRow[];
+  onDelete: (id: string) => void;
+  onAdd: () => void;
+}) {
+  const { windowStart, ticks, span } = useMemo(() => {
+    const times = rows
+      .map((r) => Date.parse(String(r.cells[dateCol.id] ?? '')))
+      .filter((n) => Number.isFinite(n));
+    const min = times.length ? Math.min(...times) : Date.now();
+    const start = new Date(min);
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    start.setMonth(start.getMonth() - 1);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 4);
+    const t: { label: string; pct: number }[] = [];
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(start);
+      d.setMonth(d.getMonth() + i);
+      t.push({ label: d.toLocaleString('es', { month: 'short', year: '2-digit' }), pct: ((d.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100 });
+    }
+    return { windowStart: start.getTime(), ticks: t, span: end.getTime() - start.getTime() };
+  }, [rows, dateCol.id]);
+
+  const selectCol = db.columns.find((c) => c.type === 'select' || c.type === 'multi_select');
+  const titleCol = db.columns[0];
+
+  const placed = rows
+    .map((row) => {
+      const ts = Date.parse(String(row.cells[dateCol.id] ?? ''));
+      const pct = Number.isFinite(ts) ? Math.min(99.2, Math.max(0.8, ((ts - windowStart) / span) * 100)) : null;
+      const opt = selectCol?.options?.find((o) => o.id === row.cells[selectCol.id]);
+      return { row, ts, pct, opt };
+    })
+    .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+  return (
+    <div className="timeline" role="list" aria-label="Línea de tiempo">
+      <div className="timeline__head">
+        <span className="timeline__corner">Fecha · {dateCol.name}</span>
+        <div className="timeline__axis">
+          {ticks.map((t) => (
+            <span key={t.label} className="timeline__tick" style={{ left: `${t.pct}%` }}>{t.label}</span>
+          ))}
+        </div>
+      </div>
+      {placed.map(({ row, pct, opt }) => (
+        <div key={row.id} className="tlrow" role="listitem">
+          <span className="tlrow__title">{titleCol ? cellText(row, titleCol) || 'Sin título' : 'Sin título'}</span>
+          <div className="tlrow__track">
+            {pct == null ? (
+              <span className="tlrow__nodate">sin fecha</span>
+            ) : (
+              <span className="tlchip" data-color={opt?.color ?? 'default'} style={{ left: `${pct}%` }}>
+                {String(row.cells[dateCol.id])}
+              </span>
+            )}
+          </div>
+          <button className="rowdel" title="Eliminar fila" aria-label="Eliminar fila" onClick={() => onDelete(row.id)}>
+            <Icon name="x" size={12} />
+          </button>
+        </div>
+      ))}
+      <button className="addrow" onClick={onAdd}><Icon name="plus" size={12} /> Nueva fila</button>
+    </div>
+  );
+}
+
+/* ── gráfico ─────────────────────────────────────────────────────────────── */
+
+function ChartView({ db }: { db: NonNullable<Page['db']> }) {
+  const candidates = db.columns;
+  const [axisId, setAxisId] = useState<string>(() => candidates[0]?.id ?? '');
+  const axis = candidates.find((c) => c.id === axisId) ?? candidates[0];
+
+  const data = useMemo((): { label: string; value: number; color?: TagColor }[] => {
+    if (!axis) return [];
+    if (axis.type === 'select' || axis.type === 'multi_select') {
+      const counts = new Map<string, number>();
+      for (const r of db.rows) {
+        const v = r.cells[axis.id];
+        const ids = Array.isArray(v) ? v : v ? [String(v)] : [];
+        if (ids.length === 0) counts.set('__none__', (counts.get('__none__') ?? 0) + 1);
+        for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
+      const arr = (axis.options ?? []).map((o) => ({ label: o.label, value: counts.get(o.id) ?? 0, color: o.color }));
+      const none = counts.get('__none__') ?? 0;
+      if (none > 0) arr.push({ label: 'Sin valor', value: none, color: 'default' });
+      return arr;
+    }
+    if (axis.type === 'checkbox') {
+      let yes = 0;
+      for (const r of db.rows) if (r.cells[axis.id]) yes += 1;
+      return [
+        { label: 'Sí', value: yes, color: 'green' },
+        { label: 'No', value: db.rows.length - yes, color: 'gray' },
+      ];
+    }
+    if (axis.type === 'date') {
+      // serie por mes (últimos 6 meses)
+      const nowD = new Date();
+      const months: { key: string; label: string }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(nowD.getFullYear(), nowD.getMonth() - i, 1);
+        months.push({
+          key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+          label: d.toLocaleString('es', { month: 'short' }),
+        });
+      }
+      const counts = new Map<string, number>();
+      for (const r of db.rows) {
+        const v = r.cells[axis.id];
+        if (typeof v === 'string' && v) {
+          const key = v.slice(0, 7);
+          if (months.some((m) => m.key === key)) counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+      }
+      return months.map((m) => ({ label: m.label, value: counts.get(m.key) ?? 0 }));
+    }
+    // texto, número, URL, correo, teléfono: conteo por valor (8 más frecuentes)
+    const counts = new Map<string, number>();
+    for (const r of db.rows) {
+      const label = cellText(r, axis).trim() || 'Sin valor';
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([label, value]) => ({ label, value }));
+  }, [db.rows, axis]);
+
+  if (candidates.length === 0) {
+    return (
+      <p style={{ color: 'var(--ink-55)', padding: '30px 8px' }}>
+        Añade una propiedad de <b>Selección</b> o <b>Fecha</b> para graficar los datos.
+      </p>
+    );
+  }
+
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const W = 760, H = 250, PT = 26, PB = 46, PL = 8, PR = 8;
+  const innerW = W - PL - PR;
+  const innerH = H - PT - PB;
+  const slot = innerW / Math.max(1, data.length);
+  const barW = Math.min(78, slot * 0.62);
+  const total = data.reduce((a, d) => a + d.value, 0);
+
+  const barFill = (color?: TagColor) =>
+    color && color !== 'default' ? `var(--tagc-${color})` : 'var(--ink-70, var(--ink))';
+
+  return (
+    <div className="chartwrap">
+      <div className="charttools">
+        <span className="charttools__label">Agrupar por</span>
+        <select
+          className="dbselect"
+          value={axis?.id ?? ''}
+          onChange={(e) => setAxisId(e.target.value)}
+          aria-label="Columna para agrupar el gráfico"
+        >
+          {candidates.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+      <svg className="chartsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico de barras de ${axis?.name ?? ''}`}>
+        {[0.25, 0.5, 0.75].map((f, i) => {
+          const y = PT + innerH * (1 - f);
+          return <line key={i} x1={PL} x2={W - PR} y1={y} y2={y} stroke="var(--line-soft)" strokeDasharray="2 5" />;
+        })}
+        <line x1={PL} x2={W - PR} y1={PT + innerH} y2={PT + innerH} stroke="var(--line)" />
+        {data.map((d, i) => {
+          const h = (d.value / max) * innerH;
+          const x = PL + i * slot + (slot - barW) / 2;
+          const y = PT + innerH - h;
+          const fill = barFill(d.color);
+          return (
+            <g key={i} className="chartbar">
+              <title>{`${d.label}: ${d.value} ${d.value === 1 ? 'fila' : 'filas'}`}</title>
+              <rect x={x} y={y} width={barW} height={Math.max(h, d.value > 0 ? 3 : 2)} rx={5} fill={fill} opacity={d.value > 0 ? 1 : 0.25} />
+              {d.value > 0 && (
+                <text x={x + barW / 2} y={y - 7} textAnchor="middle" className="chartval">{d.value}</text>
+              )}
+              <text x={x + barW / 2} y={PT + innerH + 18} textAnchor="middle" className="chartlab">{d.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+      <p className="chartfoot">{total} {total === 1 ? 'fila' : 'filas'} en el gráfico · eje: {axis?.name}</p>
+    </div>
+  );
+}
+
+/* ── calendario ──────────────────────────────────────────────────────────── */
 
 function CalendarView({
   db,
@@ -998,8 +1384,8 @@ function CalendarView({
             >
               <span className="cal__day">{c.day}</span>
               {rows.map((r) => (
-                <span key={r.id} className="cal__chip" title={String(r.cells['c-name'] ?? r.cells[Object.keys(r.cells)[0] ?? ''] ?? 'Sin título')}>
-                  {String(r.cells['c-name'] ?? r.cells[Object.keys(r.cells)[0] ?? ''] ?? 'Sin título')}
+                <span key={r.id} className="cal__chip" title={db.columns.length ? cellText(r, db.columns[0]) : 'Sin título'}>
+                  {db.columns.length ? cellText(r, db.columns[0]) : 'Sin título'}
                 </span>
               ))}
             </button>
@@ -1009,3 +1395,4 @@ function CalendarView({
     </div>
   );
 }
+

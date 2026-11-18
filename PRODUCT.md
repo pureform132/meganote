@@ -16,7 +16,7 @@ Individuals who take notes and organize personal projects: notes, lists, ideas a
 
 ## Product Purpose
 
-A local-first notes app that recreates Notion's core functionality (block editor, nested pages, databases, search) as Takenotes: opens instantly, works offline, no account, no cloud. Success = a user can replace Notion for personal note-taking and project organization without noticing what is missing, and can export their data at any time.
+A local-first notes app that recreates Notion's core functionality (block editor, nested pages, databases, search) as MEGAnote: opens instantly, works offline, no account, no cloud. Success = a user can replace Notion for personal note-taking and project organization without noticing what is missing, and can export their data at any time.
 
 ## Positioning
 
@@ -40,7 +40,7 @@ Confirmed scope (v1):
 - Backup/restore: full-workspace JSON (download + validated restore with confirmation); per-page Markdown export; desktop build via PyInstaller + WebView2.
 - Dark theme ("The Night Desk"), light default, manual toggle + OS default, persisted.
 - Persistence in IndexedDB with debounced auto-save; live "Saved · time" indicator in the sidebar.
-- Brand: "Takenotes". Interface redesigned vs Notion; max 4 colors per theme, all light (deep warm ember in dark). Recommended palette applied: paper #FDFCF8, ink #2E2A26, terracotta #C65D3B, sage #9AA88A (tints/shades derived via color-mix count as the same hues).
+- Brand: "MEGAnote". Interface redesigned vs Notion; max 4 colors per theme, all light (deep warm ember in dark). Recommended palette applied: paper #FDFCF8, ink #2E2A26, terracotta #C65D3B, sage #9AA88A (tints/shades derived via color-mix count as the same hues).
 - Spanish UI.
 
 Explicitly out of scope / undecided:
@@ -51,7 +51,7 @@ Explicitly out of scope / undecided:
 
 ## Brand Commitments
 
-- Name: Takenotes (product name may appear as "Takenotes").
+- Name: MEGAnote (product name may appear as "MEGAnote").
 - Must NOT reuse Notion's name, logo, brand assets, proprietary copy, or code verbatim. Feature parity, independent implementation and art.
 - Max 4 colors, all light; the warm paper palette above is the standing choice (user did not override it).
 
@@ -59,7 +59,7 @@ Explicitly out of scope / undecided:
 
 - Reverse-engineering analysis of the user's installed Notion desktop app (v7.44.0, MSIX) performed in this workspace; key artifacts: Electron shell (webpack), `config.json` route map (page routes `/p/…`, `/collection/…`, `/new`, `/inbox`, `/trash`, `/library`, `/meeting-notes`, `/chat`), local `notion.db` (better-sqlite3, offline cache), deep-link protocol `notion://`, offline-first architecture with local SQLite mirror, renderer chunks for internal tools. Analysis notes in `C:\Users\DAMSRIS NIBAL\AppData\Local\Temp\opencode\notion-analysis\`.
 - Notion's editor implementation lives in its remote web app (app.notion.com / www.notion.so) and is NOT present locally; local code is the desktop shell only.
-- No Takenotes assets exist yet. No real user data, testimonials, benchmarks, or customer claims exist; future work must not fabricate them.
+- No MEGAnote assets exist yet. No real user data, testimonials, benchmarks, or customer claims exist; future work must not fabricate them.
 
 ## Product Principles
 

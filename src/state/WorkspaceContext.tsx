@@ -4,7 +4,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  emptyBlock, emptyPage, newId, now,
+  emptyBlock, emptyPage, migrateDB, newId, now,
   type AppStore, type Block, type BlockType, type DBState, type Notebook, type Page, type PageKind,
 } from '../lib/types';
 import { loadStore, saveStore } from '../lib/db';
@@ -17,6 +17,12 @@ export interface WorkspaceContextValue {
   saveError: string | null;
   saveState: 'idle' | 'saving' | 'saved';
   savedAt: number | null;
+  canUndo: boolean;
+  canRedo: boolean;
+  /** incrementa con cada deshacer/rehacer: fuerza resincronizar el DOM */
+  historyVersion: number;
+  undo: () => void;
+  redo: () => void;
   pages: Page[];
   byId: Map<string, Page>;
   activePageId: string | null;
@@ -35,8 +41,6 @@ export interface WorkspaceContextValue {
   renameNotebook: (id: string, name: string) => void;
 
   createPage: (parentId: string | null, kind?: PageKind) => string;
-  duplicatePage: (id: string) => string;
-  movePage: (id: string, parentId: string | null) => boolean;
   updatePage: (id: string, patch: Partial<Omit<Page, 'id' | 'created'>>) => void;
   toggleFavorite: (id: string) => void;
   trashPage: (id: string) => void;
@@ -46,15 +50,15 @@ export interface WorkspaceContextValue {
   trashCount: number;
   trashedPages: Page[];
 
-  addBlock: (pageId: string, block: Block, index?: number) => void;
   updateBlock: (pageId: string, blockId: string, patch: Partial<Block>) => void;
   removeBlock: (pageId: string, blockId: string) => void;
+  addBlock: (pageId: string, afterId?: string | null) => string;
   splitBlock: (pageId: string, blockId: string, beforeHtml: string, beforeText: string, afterHtml: string, afterText: string) => string;
   mergeIntoPrevious: (pageId: string, blockId: string) => void;
   focusRequest: { id: string; nonce: number } | null;
   requestFocus: (id: string) => void;
 
-  updateDB: (pageId: string, updater: (db: DBState) => DBState) => void;
+  updateDB: (pageId: string, updater: (db: DBState) => DBState, tag?: string | null) => void;
   importPages: (pages: Page[]) => number;
 
   exportBackup: () => void;
@@ -92,6 +96,71 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const saveTimer = useRef<number | null>(null);
   const storeRef = useRef<AppStore | null>(null);
   const activeRef = useRef<string | null>(null);
+  const flushRequestRef = useRef(false);
+
+  // ── historial global (deshacer / rehacer) ─────────────────────────────────
+  interface HistoryEntry { store: AppStore; }
+  const undoStack = useRef<HistoryEntry[]>([]);
+  const redoStack = useRef<HistoryEntry[]>([]);
+  const [histState, setHistState] = useState({ canUndo: false, canRedo: false });
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const lastTagRef = useRef<string | null>(null);
+  const lastTagAtRef = useRef(0);
+  const HISTORY_LIMIT = 80;
+  const COALESCE_MS = 1500;
+
+  const syncHistState = useCallback(() => {
+    setHistState({ canUndo: undoStack.current.length > 0, canRedo: redoStack.current.length > 0 });
+  }, []);
+
+  const pushHistory = useCallback((prev: AppStore, tag: string | null) => {
+    const t = Date.now();
+    if (tag && tag === lastTagRef.current && t - lastTagAtRef.current < COALESCE_MS) {
+      lastTagAtRef.current = t;
+      return;
+    }
+    lastTagRef.current = tag;
+    lastTagAtRef.current = t;
+    undoStack.current.push({ store: prev });
+    if (undoStack.current.length > HISTORY_LIMIT) undoStack.current.shift();
+    redoStack.current = [];
+    syncHistState();
+  }, [syncHistState]);
+
+  /** Cambia el almacén registrando historial. `tag` agrupa ráfagas (p. ej. tecleo). */
+  const changeStore = useCallback(
+    (fn: (prev: AppStore) => AppStore, tag: string | null = null, flush = false) => {
+      const snapshot = storeRef.current;
+      if (snapshot) pushHistory(snapshot, tag);
+      if (flush) flushRequestRef.current = true;
+      setStore((prev) => (prev ? fn(prev) : prev));
+    },
+    [pushHistory],
+  );
+
+  const undo = useCallback(() => {
+    const entry = undoStack.current.pop();
+    if (!entry) return;
+    const cur = storeRef.current;
+    if (cur) redoStack.current.push({ store: cur });
+    lastTagRef.current = null;
+    flushRequestRef.current = true;
+    setStore(entry.store);
+    setHistoryVersion((v) => v + 1);
+    syncHistState();
+  }, [syncHistState]);
+
+  const redo = useCallback(() => {
+    const entry = redoStack.current.pop();
+    if (!entry) return;
+    const cur = storeRef.current;
+    if (cur) undoStack.current.push({ store: cur });
+    lastTagRef.current = null;
+    flushRequestRef.current = true;
+    setStore(entry.store);
+    setHistoryVersion((v) => v + 1);
+    syncHistState();
+  }, [syncHistState]);
 
   useEffect(() => {
     storeRef.current = store;
@@ -105,8 +174,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
+        if (navigator.storage?.persist) navigator.storage.persist().catch(() => undefined);
         const stored = await loadStore();
         const initial = stored ?? seedStore();
+        for (const n of initial.notebooks) for (const p of n.pages) if (p.db) migrateDB(p.db);
         if (cancelled) return;
         setStore(initial);
         const first = initial.notebooks.find((n) => n.id === initial.currentId)?.pages[0] ?? initial.notebooks[0]?.pages[0];
@@ -126,11 +197,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // persistencia con debounce
+  // persistencia con debounce (los cambios estructurales piden guardado inmediato)
   useEffect(() => {
     if (!loaded || !store) return;
     setSaveState('saving');
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    const delay = flushRequestRef.current ? 0 : 350;
+    flushRequestRef.current = false;
     saveTimer.current = window.setTimeout(() => {
       saveStore(store)
         .then(() => {
@@ -142,11 +215,41 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setSaveError(e instanceof Error ? e.message : 'No se pudo guardar');
           setSaveState('idle');
         });
-    }, 350);
+    }, delay);
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
   }, [store, loaded]);
+
+  // flush best-effort al ocultar/cerrar la ventana (evita perder cambios al salir)
+  useEffect(() => {
+    const flush = () => {
+      const s = storeRef.current;
+      if (!s) return;
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+      }
+      saveStore(s)
+        .then(() => {
+          setSaveError(null);
+          setSaveState('saved');
+          setSavedAt(Date.now());
+        })
+        .catch(() => setSaveState('idle'));
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('blur', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('blur', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   const notebooksMeta = useMemo(
     () => (store?.notebooks ?? []).map((n) => ({ id: n.id, name: n.name, icon: n.icon })),
@@ -162,16 +265,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const trashedPages = useMemo(() => pages.filter((p) => p.trashed), [pages]);
   const trashCount = trashedPages.length;
 
-  const updateCurrent = useCallback((fn: (pages: Page[]) => Page[]) => {
-    setStore((prev) => {
-      if (!prev) return prev;
-      const current = prev.notebooks.find((n) => n.id === prev.currentId) ?? prev.notebooks[0];
-      if (!current) return prev;
-      const nextPages = fn(current.pages);
-      const nextNotebooks = prev.notebooks.map((n) => (n.id === current.id ? { ...n, pages: nextPages } : n));
-      return { ...prev, notebooks: nextNotebooks };
-    });
-  }, []);
+  const updateCurrent = useCallback((fn: (pages: Page[]) => Page[], tag: string | null = null, flush = false) => {
+    changeStore(
+      (prev) => {
+        const current = prev.notebooks.find((n) => n.id === prev.currentId) ?? prev.notebooks[0];
+        if (!current) return prev;
+        const nextPages = fn(current.pages);
+        const nextNotebooks = prev.notebooks.map((n) => (n.id === current.id ? { ...n, pages: nextPages } : n));
+        return { ...prev, notebooks: nextNotebooks };
+      },
+      tag,
+      flush,
+    );
+  }, [changeStore]);
 
   const touch = (patch: Partial<Page>) => ({ ...patch, updated: now() });
 
@@ -188,7 +294,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const createNotebook = useCallback((name: string) => {
     const id = newId();
-    setStore((prev) => {
+    changeStore((prev) => {
       const fresh: Notebook = {
         id,
         name: name.trim() || 'Nuevo workspace',
@@ -203,20 +309,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActivePageId(null);
     setShowTrash(false);
     return id;
-  }, []);
+  }, [changeStore]);
 
   const renameNotebook = useCallback((id: string, name: string) => {
-    setStore((prev) =>
-      prev
-        ? { ...prev, notebooks: prev.notebooks.map((n) => (n.id === id ? { ...n, name: name.trim() || n.name } : n)) }
-        : prev,
+    changeStore(
+      (prev) =>
+        prev
+          ? { ...prev, notebooks: prev.notebooks.map((n) => (n.id === id ? { ...n, name: name.trim() || n.name } : n)) }
+          : prev,
+      `nbname:${id}`,
     );
-  }, []);
+  }, [changeStore]);
 
   const createPage = useCallback(
     (parentId: string | null, kind: PageKind = 'page') => {
       const p = emptyPage(parentId, kind);
-      updateCurrent((prev) => [...prev, p]);
+      updateCurrent((prev) => [...prev, p], null, true);
       setActivePageId(p.id);
       setShowTrash(false);
       return p.id;
@@ -224,63 +332,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [updateCurrent],
   );
 
-  const duplicatePage = useCallback(
-    (id: string) => {
-      const source = pages.find((p) => p.id === id);
-      if (!source) return '';
-      const ids = subtreeIds(pages, id);
-      const ordered = pages.filter((p) => ids.has(p.id));
-      const idMap = new Map(ordered.map((p) => [p.id, newId()]));
-      const t = now();
-      const copies: Page[] = ordered.map((p, index) => ({
-        ...p,
-        id: idMap.get(p.id)!,
-        parentId: p.parentId && idMap.has(p.parentId) ? idMap.get(p.parentId)! : p.parentId,
-        title: index === 0 ? (p.title ? `${p.title} (copia)` : 'Copia sin título') : p.title,
-        favorite: false,
-        trashed: false,
-        created: t,
-        updated: t,
-        blocks: p.blocks.map((b) => ({
-          ...b,
-          id: newId(),
-          pageId: b.pageId && idMap.has(b.pageId) ? idMap.get(b.pageId)! : b.pageId,
-        })),
-        db: p.db ? (JSON.parse(JSON.stringify(p.db)) as DBState) : undefined,
-      }));
-      const root = copies[0];
-      if (!root) return '';
-      updateCurrent((prev) => [...prev, ...copies]);
-      setActivePageId(root.id);
-      setShowTrash(false);
-      return root.id;
-    },
-    [pages, updateCurrent],
-  );
-
-  const movePage = useCallback(
-    (id: string, parentId: string | null) => {
-      if (id === parentId) return false;
-      const ids = subtreeIds(pages, id);
-      if (parentId && ids.has(parentId)) return false;
-      updateCurrent((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, parentId, updated: now() } : p)),
-      );
-      return true;
-    },
-    [pages, updateCurrent],
-  );
-
   const updatePage = useCallback(
     (id: string, patch: Partial<Omit<Page, 'id' | 'created'>>) => {
-      updateCurrent((prev) => prev.map((p) => (p.id === id ? { ...p, ...touch(patch) } : p)));
+      updateCurrent((prev) => prev.map((p) => (p.id === id ? { ...p, ...touch(patch) } : p)), `page:${id}:${Object.keys(patch).join(',')}`);
     },
     [updateCurrent],
   );
 
   const toggleFavorite = useCallback(
     (id: string) => {
-      updateCurrent((prev) => prev.map((p) => (p.id === id ? { ...p, favorite: !p.favorite } : p)));
+      updateCurrent((prev) => prev.map((p) => (p.id === id ? { ...p, favorite: !p.favorite } : p)), null, true);
     },
     [updateCurrent],
   );
@@ -288,7 +349,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const trashPage = useCallback(
     (id: string) => {
       const ids = subtreeIds(pages, id);
-      updateCurrent((prev) => prev.map((p) => (ids.has(p.id) ? { ...p, trashed: true } : p)));
+      updateCurrent((prev) => prev.map((p) => (ids.has(p.id) ? { ...p, trashed: true } : p)), null, true);
       const act = activeRef.current;
       if (act && ids.has(act)) {
         setShowTrash(true);
@@ -301,7 +362,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const restorePage = useCallback(
     (id: string) => {
       const ids = subtreeIds(pages, id);
-      updateCurrent((prev) => prev.map((p) => (ids.has(p.id) ? { ...p, trashed: false } : p)));
+      updateCurrent((prev) => prev.map((p) => (ids.has(p.id) ? { ...p, trashed: false } : p)), null, true);
     },
     [pages, updateCurrent],
   );
@@ -309,45 +370,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const deletePageForever = useCallback(
     (id: string) => {
       const ids = subtreeIds(pages, id);
-      updateCurrent((prev) => prev.filter((p) => !ids.has(p.id)));
+      updateCurrent((prev) => prev.filter((p) => !ids.has(p.id)), null, true);
       setActivePageId((cur) => (cur && ids.has(cur) ? null : cur));
     },
     [pages, updateCurrent],
   );
 
   const emptyTrash = useCallback(() => {
-    updateCurrent((prev) => prev.filter((p) => !p.trashed));
+    updateCurrent((prev) => prev.filter((p) => !p.trashed), null, true);
     setActivePageId(null);
     setShowTrash(false);
   }, [updateCurrent]);
 
-  const addBlock = useCallback(
-    (pageId: string, block: Block, index?: number) => {
-      updateCurrent((prev) =>
-        prev.map((p) => {
-          if (p.id !== pageId) return p;
-          const blocks = [...p.blocks];
-          const at = index === undefined ? blocks.length : Math.max(0, Math.min(index, blocks.length));
-          blocks.splice(at, 0, block);
-          return { ...p, blocks, updated: now() };
-        }),
-      );
-    },
-    [updateCurrent],
-  );
-
   const updateBlock = useCallback(
     (pageId: string, blockId: string, patch: Partial<Block>) => {
-      updateCurrent((prev) =>
-        prev.map((p) =>
-          p.id === pageId
-            ? {
-                ...p,
-                updated: now(),
-                blocks: p.blocks.map((b) => (b.id === blockId ? { ...b, ...patch, text: patch.text ?? (patch.html !== undefined ? htmlToText(patch.html) : b.text) } : b)),
-              }
-            : p,
-        ),
+      updateCurrent(
+        (prev) =>
+          prev.map((p) =>
+            p.id === pageId
+              ? {
+                  ...p,
+                  updated: now(),
+                  blocks: p.blocks.map((b) => (b.id === blockId ? { ...b, ...patch, text: patch.text ?? (patch.html !== undefined ? htmlToText(patch.html) : b.text) } : b)),
+                }
+              : p,
+          ),
+        `block:${pageId}:${blockId}`,
       );
     },
     [updateCurrent],
@@ -355,12 +403,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const removeBlock = useCallback(
     (pageId: string, blockId: string) => {
-      updateCurrent((prev) =>
-        prev.map((p) => {
-          if (p.id !== pageId) return p;
-          const blocks = p.blocks.filter((b) => b.id !== blockId);
-          return { ...p, blocks: blocks.length ? blocks : [emptyBlock('text')], updated: now() };
-        }),
+      updateCurrent(
+        (prev) =>
+          prev.map((p) => {
+            if (p.id !== pageId) return p;
+            const blocks = p.blocks.filter((b) => b.id !== blockId);
+            return { ...p, blocks: blocks.length ? blocks : [emptyBlock('text')], updated: now() };
+          }),
+        null,
+        true,
       );
     },
     [updateCurrent],
@@ -369,28 +420,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const splitBlock = useCallback(
     (pageId: string, blockId: string, beforeHtml: string, beforeText: string, afterHtml: string, afterText: string) => {
       const newId2 = newId();
-      updateCurrent((prev) =>
-        prev.map((p) => {
-          if (p.id !== pageId) return p;
-          const i = p.blocks.findIndex((b) => b.id === blockId);
-          if (i < 0) return p;
-          const src = p.blocks[i];
-          const childType: BlockType =
-            src.type === 'bulleted' || src.type === 'numbered' || src.type === 'todo' || src.type === 'toggle' ? src.type : 'text';
-          const before: Block = { ...src, html: beforeHtml, text: beforeText };
-          const after: Block = {
-            id: newId2,
-            type: childType,
-            html: afterHtml,
-            text: afterText,
-            level: src.level,
-            checked: childType === 'todo' ? false : undefined,
-            open: childType === 'toggle' ? true : undefined,
-          };
-          const blocks = [...p.blocks];
-          blocks.splice(i, 1, before, after);
-          return { ...p, blocks, updated: now() };
-        }),
+      updateCurrent(
+        (prev) =>
+          prev.map((p) => {
+            if (p.id !== pageId) return p;
+            const i = p.blocks.findIndex((b) => b.id === blockId);
+            if (i < 0) return p;
+            const src = p.blocks[i];
+            const childType: BlockType =
+              src.type === 'bulleted' || src.type === 'numbered' || src.type === 'todo' || src.type === 'toggle' ? src.type : 'text';
+            const before: Block = { ...src, html: beforeHtml, text: beforeText };
+            const after: Block = {
+              id: newId2,
+              type: childType,
+              html: afterHtml,
+              text: afterText,
+              level: src.level,
+              checked: childType === 'todo' ? false : undefined,
+              open: childType === 'toggle' ? true : undefined,
+            };
+            const blocks = [...p.blocks];
+            blocks.splice(i, 1, before, after);
+            return { ...p, blocks, updated: now() };
+          }),
+        null,
+        true,
       );
       return newId2;
     },
@@ -399,23 +453,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const mergeIntoPrevious = useCallback(
     (pageId: string, blockId: string) => {
-      updateCurrent((prev) =>
-        prev.map((p) => {
-          if (p.id !== pageId) return p;
-          const i = p.blocks.findIndex((b) => b.id === blockId);
-          if (i <= 0) return p;
-          const prevBlock = p.blocks[i - 1];
-          const cur = p.blocks[i];
-          if (prevBlock.type === 'divider' || prevBlock.type === 'image') return p;
-          const merged: Block = {
-            ...prevBlock,
-            html: prevBlock.html + cur.html,
-            text: (prevBlock.text + ' ' + cur.text).trim(),
-          };
-          const blocks = [...p.blocks];
-          blocks.splice(i - 1, 2, merged);
-          return { ...p, blocks, updated: now() };
-        }),
+      updateCurrent(
+        (prev) =>
+          prev.map((p) => {
+            if (p.id !== pageId) return p;
+            const i = p.blocks.findIndex((b) => b.id === blockId);
+            if (i <= 0) return p;
+            const prevBlock = p.blocks[i - 1];
+            const cur = p.blocks[i];
+            if (prevBlock.type === 'divider' || prevBlock.type === 'image') return p;
+            const merged: Block = {
+              ...prevBlock,
+              html: prevBlock.html + cur.html,
+              text: (prevBlock.text + ' ' + cur.text).trim(),
+            };
+            const blocks = [...p.blocks];
+            blocks.splice(i - 1, 2, merged);
+            return { ...p, blocks, updated: now() };
+          }),
+        null,
+        true,
       );
     },
     [updateCurrent],
@@ -425,10 +482,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setFocusRequest({ id, nonce: Date.now() });
   }, []);
 
+  const addBlock = useCallback(
+    (pageId: string, afterId?: string | null) => {
+      const id = newId();
+      updateCurrent(
+        (prev) =>
+          prev.map((p) => {
+            if (p.id !== pageId) return p;
+            const blocks = [...p.blocks];
+            const nb = { ...emptyBlock('text'), id };
+            const idx = afterId ? blocks.findIndex((b) => b.id === afterId) : -1;
+            if (idx >= 0) blocks.splice(idx + 1, 0, nb);
+            else blocks.push(nb);
+            return { ...p, blocks, updated: now() };
+          }),
+        null,
+        true,
+      );
+      setFocusRequest({ id, nonce: Date.now() });
+      return id;
+    },
+    [updateCurrent],
+  );
+
   const updateDB = useCallback(
-    (pageId: string, updater: (db: DBState) => DBState) => {
-      updateCurrent((prev) =>
-        prev.map((p) => (p.id === pageId && p.db ? { ...p, db: updater(p.db), updated: now() } : p)),
+    (pageId: string, updater: (db: DBState) => DBState, tag: string | null = null) => {
+      updateCurrent(
+        (prev) => prev.map((p) => (p.id === pageId && p.db ? { ...p, db: updater(p.db), updated: now() } : p)),
+        tag ? `db:${pageId}:${tag}` : `db:${pageId}`,
+        true,
       );
     },
     [updateCurrent],
@@ -437,7 +519,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const importPages = useCallback(
     (incoming: Page[]) => {
       if (incoming.length === 0) return 0;
-      updateCurrent((prev) => [...prev, ...incoming]);
+      updateCurrent((prev) => [...prev, ...incoming], null, true);
       return incoming.length;
     },
     [updateCurrent],
@@ -446,7 +528,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const exportBackup = useCallback(() => {
     const s = storeRef.current;
     if (!s) return;
-    downloadFile(`takenotes-backup-${timestamp()}.json`, workspaceToJSON(s), 'application/json');
+    downloadFile(`meganote-backup-${timestamp()}.json`, workspaceToJSON(s), 'application/json');
   }, []);
 
   const exportPageMarkdown = useCallback((pageId: string) => {
@@ -460,7 +542,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         .replace(/[^a-z0-9áéíóúñü]+/gi, '-')
         .replace(/^-+|-+$/g, '')
         .slice(0, 60) || 'pagina';
-    downloadFile(`takenotes-${safe}-${timestamp()}.md`, pageToMarkdown(p, current?.pages), 'text/markdown');
+    downloadFile(`meganote-${safe}-${timestamp()}.md`, pageToMarkdown(p), 'text/markdown');
   }, []);
 
   const importBackup = useCallback(async (file: File) => {
@@ -487,6 +569,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           notebooks: normalized,
           currentId: typeof d.currentId === 'string' && normalized.some((n) => n.id === d.currentId) ? (d.currentId as string) : normalized[0].id,
         };
+        const prev = storeRef.current;
+        if (prev) pushHistory(prev, null);
         setStore(store);
         setActivePageId(store.notebooks.find((n) => n.id === store.currentId)?.pages[0]?.id ?? null);
         setShowTrash(false);
@@ -512,6 +596,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           pages: valid.map(normalizePage),
         };
         const store: AppStore = { version: 2, notebooks: [notebook], currentId: notebook.id };
+        const prev = storeRef.current;
+        if (prev) pushHistory(prev, null);
         setStore(store);
         setActivePageId(notebook.pages[0]?.id ?? null);
         setShowTrash(false);
@@ -519,17 +605,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         return { ok: true, count: notebook.pages.length };
       }
 
-      return { ok: false, error: 'Formato no reconocido — se esperaba un backup Takenotes (v1 o v2).' };
+      return { ok: false, error: 'Formato no reconocido — se esperaba un backup MEGAnote (v1 o v2).' };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : 'No se pudo leer el archivo de backup.' };
     }
-  }, []);
+  }, [pushHistory]);
 
   const value: WorkspaceContextValue = {
     loaded,
     saveError,
     saveState,
     savedAt,
+    canUndo: histState.canUndo,
+    canRedo: histState.canRedo,
+    historyVersion,
+    undo,
+    redo,
     pages: visiblePages,
     byId,
     activePageId,
@@ -545,8 +636,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     createNotebook,
     renameNotebook,
     createPage,
-    duplicatePage,
-    movePage,
     updatePage,
     toggleFavorite,
     trashPage,
@@ -555,9 +644,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     emptyTrash,
     trashCount,
     trashedPages,
-    addBlock,
     updateBlock,
     removeBlock,
+    addBlock,
     splitBlock,
     mergeIntoPrevious,
     focusRequest,
@@ -573,13 +662,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 }
 
 function normalizePage(p: Page): Page {
-  return {
+  const page: Page = {
     ...p,
     favorite: !!p.favorite,
     trashed: !!p.trashed,
     blocks: p.blocks ?? [],
     parentId: typeof p.parentId === 'string' ? p.parentId : null,
   };
+  if (page.db) migrateDB(page.db);
+  return page;
 }
 
 export function useWorkspace(): WorkspaceContextValue {
