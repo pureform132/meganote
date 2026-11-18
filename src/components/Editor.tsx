@@ -1,4 +1,4 @@
-﻿import {
+import {
   useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent,
 } from 'react';
 import { useWorkspace } from '../state/WorkspaceContext';

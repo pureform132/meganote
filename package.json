@@ -1,8 +1,8 @@
-﻿{
+{
     "name": "meganote",
     "private": true,
     "version": "1.3.0",
-    "description": "MEGAnote - tus notas, en papel. Alternativa a Notion local-first: bloques, bases de datos con 7 vistas, bÃºsqueda instantÃ¡nea y copias de seguridad. Sin cuenta, sin nube, sin telemetrÃ­a.",
+    "description": "MEGAnote - tus notas, en papel. Alternativa a Notion local-first: bloques, bases de datos con 7 vistas, búsqueda instantánea y copias de seguridad. Sin cuenta, sin nube, sin telemetría.",
     "type": "module",
     "scripts": {
         "dev": "vite",
